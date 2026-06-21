@@ -47,6 +47,12 @@ header h1 span{color:var(--gold);}
 .word-row .del-btn{background:rgba(255,82,82,.2);border:none;color:#ff5252;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem;flex-shrink:0;}
 .word-row .del-btn:hover{background:rgba(255,82,82,.4);}
 .answer-row{display:flex;align-items:center;gap:8px;margin-top:10px;background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.2);border-radius:10px;padding:10px 12px;flex-wrap:wrap;}
+.paste-area{width:100%;min-height:90px;padding:10px 13px;border-radius:10px;border:1px dashed rgba(255,255,255,.25);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:.88rem;resize:vertical;outline:none;transition:border .2s;line-height:1.7;}
+.paste-area:focus{border-color:var(--gold);background:rgba(255,255,255,.08);}
+.paste-area::placeholder{color:rgba(255,255,255,.3);}
+.paste-toggle{display:flex;gap:6px;margin-bottom:10px;}
+.mode-btn{padding:5px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s;}
+.mode-btn.active{background:var(--gold);color:#0a2342;border-color:var(--gold);}
 .answer-row label{font-size:.8rem;opacity:.7;white-space:nowrap;}
 #preview-pond{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:36px;}
 .preview-chip{background:rgba(255,255,255,.1);border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:4px;}
@@ -294,28 +300,50 @@ function renderSetupTabs(){
   }
 }
 
+// 라운드별 입력 모드: 0=붙여넣기, 1=직접입력
+let inputMode=Array(5).fill(0);
+
 function renderSetupRound(ri){
   const cfg=roundConfigs[ri];
   const c=$('round-settings');c.innerHTML='';
+  const mode=inputMode[ri];
 
-  // 단어 섹션
-  const ws=document.createElement('div');
-  ws.innerHTML='<div style="font-size:.78rem;opacity:.6;margin-bottom:8px;">📌 낚시터에 풀 단어 &amp; 개수 <span style="opacity:.65">(1~4, 개수만큼 여러 명이 낚을 수 있어요)</span></div>';
+  // ── 모드 토글 ──
+  const toggle=document.createElement('div');toggle.className='paste-toggle';
+  toggle.innerHTML=`
+    <button class="mode-btn${mode===0?' active':''}" onclick="setInputMode(${ri},0)">📋 붙여넣기</button>
+    <button class="mode-btn${mode===1?' active':''}" onclick="setInputMode(${ri},1)">✏️ 직접 입력</button>`;
+  c.appendChild(toggle);
 
-  cfg.words.forEach((entry,idx)=>{
-    const row=document.createElement('div');row.className='word-row';
-    row.innerHTML=`<input class="inp" placeholder="단어" value="${entry.word||''}" style="flex:2" oninput="updateWord(${ri},${idx},'word',this.value)"/>
-      <input class="inp" type="number" min="1" max="4" value="${entry.count||2}" style="width:60px;text-align:center" oninput="updateWord(${ri},${idx},'count',this.value)"/>
-      <span style="font-size:.7rem;opacity:.4;white-space:nowrap">개</span>
-      <button class="del-btn" onclick="removeWord(${ri},${idx})">✕</button>`;
-    ws.appendChild(row);
-  });
+  if(mode===0){
+    // ── 붙여넣기 모드 ──
+    const pasteVal=cfg.words.filter(w=>w.word.trim()).map(w=>w.word.trim()).join('\n');
+    const wrap=document.createElement('div');
+    wrap.innerHTML=`<div style="font-size:.78rem;opacity:.6;margin-bottom:6px;">📌 단어를 한 줄에 하나씩 붙여넣으세요 — 개수는 자동 랜덤(1~4)</div>
+      <textarea class="paste-area" id="paste-ta-${ri}" placeholder="예)\n보험\n치료비\n강아지\n병원">${pasteVal}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button class="btn btn-primary" style="font-size:.82rem;padding:7px 16px" onclick="applyPaste(${ri})">✅ 적용</button>
+        <span id="paste-count-${ri}" style="font-size:.78rem;opacity:.55;">${cfg.words.filter(w=>w.word.trim()).length}개 입력됨</span>
+      </div>`;
+    c.appendChild(wrap);
+  } else {
+    // ── 직접 입력 모드 ──
+    const ws=document.createElement('div');
+    ws.innerHTML='<div style="font-size:.78rem;opacity:.6;margin-bottom:8px;">📌 단어 &amp; 개수 직접 입력 <span style="opacity:.65">(개수: 1~4, 해당 수만큼 여러 명이 낚을 수 있어요)</span></div>';
+    cfg.words.forEach((entry,idx)=>{
+      const row=document.createElement('div');row.className='word-row';
+      row.innerHTML=`<input class="inp" placeholder="단어" value="${entry.word||''}" style="flex:2" oninput="updateWord(${ri},${idx},'word',this.value)"/>
+        <input class="inp" type="number" min="1" max="4" value="${entry.count||2}" style="width:60px;text-align:center" oninput="updateWord(${ri},${idx},'count',this.value)"/>
+        <span style="font-size:.7rem;opacity:.4;white-space:nowrap">개</span>
+        <button class="del-btn" onclick="removeWord(${ri},${idx})">✕</button>`;
+      ws.appendChild(row);
+    });
+    const ab=document.createElement('button');ab.className='btn btn-secondary';ab.style.cssText='font-size:.82rem;padding:7px 14px;margin-top:4px;';
+    ab.textContent='+ 단어 추가';ab.onclick=()=>{roundConfigs[ri].words.push({word:'',count:2});renderSetupRound(ri);renderSetupTabs();};
+    ws.appendChild(ab);c.appendChild(ws);
+  }
 
-  const ab=document.createElement('button');ab.className='btn btn-secondary';ab.style.cssText='font-size:.82rem;padding:7px 14px;margin-top:4px;';
-  ab.textContent='+ 단어 추가';ab.onclick=()=>{roundConfigs[ri].words.push({word:'',count:2});renderSetupRound(ri);renderSetupTabs();};
-  ws.appendChild(ab);c.appendChild(ws);
-
-  // 제시어/정답
+  // ── 제시어/정답 (공통) ──
   const ar=document.createElement('div');ar.className='answer-row';
   ar.innerHTML=`<label>🎯 제시어</label>
     <input class="inp" placeholder="힌트 문구 (예: 비용 관련 단어?)" value="${cfg.prompt||''}" style="flex:1;min-width:120px" oninput="updateMeta(${ri},'prompt',this.value)"/>
@@ -324,6 +352,20 @@ function renderSetupRound(ri){
   c.appendChild(ar);
   updatePreview(ri);
 }
+
+window.setInputMode=function(ri,mode){inputMode[ri]=mode;renderSetupRound(ri);};
+
+window.applyPaste=function(ri){
+  const ta=$(`paste-ta-${ri}`);
+  if(!ta)return;
+  const lines=ta.value.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  const counts=[1,1,2,2,3,3,4];
+  roundConfigs[ri].words=lines.map(w=>({word:w,count:counts[Math.floor(Math.random()*counts.length)]}));
+  const countEl=$(`paste-count-${ri}`);
+  if(countEl)countEl.textContent=`${lines.length}개 적용됨 ✓`;
+  updatePreview(ri);renderSetupTabs();
+  toast(`✅ ${lines.length}개 단어 적용!`);
+};
 
 window.updateWord=function(ri,idx,key,val){
   roundConfigs[ri].words[idx][key]=key==='count'?Math.max(1,Math.min(4,parseInt(val)||1)):val;
