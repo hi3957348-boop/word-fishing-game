@@ -126,7 +126,7 @@ header h1 span{color:var(--gold);}
 <div id="bubbles"></div>
 <header>
   <h1>🎣 단어<span>낚시</span></h1>
-  <div id="room-info">반려동물 보험 에디션</div>
+  <div id="room-info"></div>
 </header>
 
 <!-- 로비 -->
@@ -134,7 +134,7 @@ header h1 span{color:var(--gold);}
   <div class="lobby-card">
     <h2>🐠 게임 입장</h2>
     <label>닉네임</label>
-    <input class="inp" id="nickname" placeholder="예: 강아지사랑" maxlength="8"/>
+    <input class="inp" id="nickname" placeholder="예: 하늘이" maxlength="8"/>
     <label>방 코드</label>
     <input class="inp" id="room-code" placeholder="예: FISH01" maxlength="8" style="text-transform:uppercase"/>
     <div style="display:flex;gap:8px;margin-top:4px;">
@@ -258,11 +258,7 @@ const firebaseConfig = {
 const app=initializeApp(firebaseConfig);
 const db=getDatabase(app);
 
-const DEFAULT_WORDS=[
-  {word:"반려동물",count:3},{word:"가족",count:4},{word:"치료",count:2},{word:"병원",count:3},
-  {word:"수술",count:2},{word:"치료비",count:1},{word:"슬개골",count:2},{word:"심장병",count:1},
-  {word:"보호자",count:3},{word:"보험",count:4},{word:"가입",count:2},{word:"보장",count:2}
-];
+const DEFAULT_WORDS=[];
 const PLAYER_COLORS=["#ff7043","#ab47bc","#26a69a","#42a5f5"];
 const FISH_COLORS=[
   ["#0d47a1","#1565c0"],["#1b5e20","#2e7d32"],["#4a148c","#6a1b9a"],
@@ -274,11 +270,7 @@ const FISH_COLORS=[
 let roomId,playerId,playerName,isHost;
 let gameState={};
 let curSetupRound=0;
-let roundConfigs=Array.from({length:5},(_,i)=>({
-  words: i===0 ? DEFAULT_WORDS.map(w=>({...w})) : [],
-  prompt: i===0 ? '치료비 관련 단어는?' : '',
-  answer: i===0 ? '치료비' : ''
-}));
+let roundConfigs=Array.from({length:5},()=>({words:[],prompt:'',answer:''}));
 
 const $=id=>document.getElementById(id);
 function toast(msg,dur=2500){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
