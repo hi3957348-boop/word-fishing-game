@@ -1,938 +1,614 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎣 단어낚시 게임</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;900&display=swap');
-
-    :root {
-      --ocean-deep: #0a2342;
-      --ocean-mid:  #0d3b6e;
-      --ocean-light:#1565c0;
-      --wave:       #1e88e5;
-      --foam:       #e3f2fd;
-      --sand:       #fff8e1;
-      --coral:      #ff5252;
-      --gold:       #ffd600;
-      --green:      #00c853;
-      --text-light: #e3f2fd;
-      --text-dark:  #0a2342;
-
-      --p1: #ff7043; /* 플레이어 색상 */
-      --p2: #ab47bc;
-      --p3: #26a69a;
-      --p4: #42a5f5;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'Noto Sans KR', sans-serif;
-      background: linear-gradient(180deg, var(--ocean-deep) 0%, var(--ocean-mid) 60%, #1a237e 100%);
-      min-height: 100vh;
-      color: var(--text-light);
-      overflow-x: hidden;
-    }
-
-    /* ── 헤더 ── */
-    header {
-      text-align: center;
-      padding: 18px 20px 10px;
-      position: relative;
-    }
-    header h1 {
-      font-size: 2rem;
-      font-weight: 900;
-      letter-spacing: -1px;
-      text-shadow: 0 2px 12px rgba(0,0,0,.5);
-    }
-    header h1 span { color: var(--gold); }
-    #room-info {
-      font-size: .8rem;
-      opacity: .7;
-      margin-top: 4px;
-    }
-
-    /* ── 진입 화면 ── */
-    #lobby {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      min-height: 80vh;
-      padding: 20px;
-    }
-    #lobby h2 { font-size: 1.4rem; font-weight: 700; text-align: center; }
-    .lobby-card {
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 16px;
-      padding: 28px 32px;
-      width: 100%;
-      max-width: 360px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .lobby-card label { font-size: .85rem; font-weight: 600; opacity: .8; }
-    .lobby-card input, .lobby-card select {
-      width: 100%;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.2);
-      background: rgba(255,255,255,.1);
-      color: #fff;
-      font-size: 1rem;
-      font-family: inherit;
-      outline: none;
-      transition: border .2s;
-    }
-    .lobby-card input::placeholder { color: rgba(255,255,255,.4); }
-    .lobby-card input:focus { border-color: var(--gold); }
-
-    /* ── 버튼 ── */
-    .btn {
-      padding: 11px 22px;
-      border-radius: 12px;
-      border: none;
-      font-family: inherit;
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform .15s, box-shadow .15s, opacity .15s;
-    }
-    .btn:active { transform: scale(.96); }
-    .btn-primary {
-      background: linear-gradient(135deg, #ffd600, #ff8f00);
-      color: #0a2342;
-      box-shadow: 0 4px 16px rgba(255,214,0,.3);
-    }
-    .btn-primary:hover { box-shadow: 0 6px 20px rgba(255,214,0,.5); }
-    .btn-secondary {
-      background: rgba(255,255,255,.12);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,.2);
-    }
-    .btn-ghost {
-      background: transparent;
-      color: var(--gold);
-      border: 1px solid var(--gold);
-    }
-    .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-
-    /* ── 게임 레이아웃 ── */
-    #game { display: none; padding: 0 10px 20px; }
-
-    /* 스코어보드 */
-    #scoreboard {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      margin: 8px auto 12px;
-      flex-wrap: wrap;
-      max-width: 600px;
-    }
-    .score-chip {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: .82rem;
-      font-weight: 700;
-      background: rgba(255,255,255,.1);
-      border: 2px solid transparent;
-      transition: border .2s;
-    }
-    .score-chip.me { border-color: var(--gold); }
-    .score-chip .dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
-
-    /* 방장 컨트롤 */
-    #host-panel {
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin: 0 auto 14px;
-      max-width: 600px;
-      display: none;
-    }
-    #host-panel h3 { font-size: .9rem; font-weight: 700; margin-bottom: 10px; opacity: .8; }
-    #host-panel .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    #host-panel input {
-      flex: 1; min-width: 120px;
-      padding: 9px 13px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.2);
-      background: rgba(255,255,255,.1);
-      color: #fff;
-      font-size: .95rem;
-      font-family: inherit;
-      outline: none;
-    }
-    #host-panel input:focus { border-color: var(--gold); }
-    #host-panel input::placeholder { color: rgba(255,255,255,.4); }
-    #host-panel select {
-      padding: 9px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.2);
-      background: rgba(20,40,80,.8);
-      color: #fff;
-      font-family: inherit;
-      font-size: .9rem;
-      outline: none;
-    }
-
-    /* 현재 라운드 표시 */
-    #round-display {
-      text-align: center;
-      margin: 0 auto 14px;
-      max-width: 600px;
-    }
-    #round-display .prompt-box {
-      background: linear-gradient(135deg, rgba(255,214,0,.15), rgba(255,143,0,.1));
-      border: 1px solid rgba(255,214,0,.4);
-      border-radius: 14px;
-      padding: 14px 20px;
-      display: inline-block;
-      min-width: 200px;
-    }
-    #round-display .prompt-label { font-size: .75rem; opacity: .7; margin-bottom: 4px; }
-    #round-display .prompt-text { font-size: 1.5rem; font-weight: 900; color: var(--gold); }
-    #round-display .prompt-count { font-size: .8rem; opacity: .7; margin-top: 2px; }
-
-    /* ── 중앙 낚시터 ── */
-    #pond {
-      position: relative;
-      max-width: 600px;
-      margin: 0 auto 16px;
-      min-height: 260px;
-      background: radial-gradient(ellipse at 50% 60%, rgba(21,101,192,.4) 0%, rgba(10,35,66,.6) 100%);
-      border-radius: 20px;
-      border: 1px solid rgba(30,136,229,.3);
-      overflow: hidden;
-      padding: 14px;
-    }
-    #pond::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, rgba(100,180,255,.5), transparent);
-      animation: shimmer 3s infinite;
-    }
-    @keyframes shimmer { 0%,100%{opacity:.3} 50%{opacity:1} }
-
-    #pond-label {
-      font-size: .75rem;
-      font-weight: 700;
-      opacity: .5;
-      text-align: center;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    #fish-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      justify-content: center;
-      align-items: center;
-      padding: 6px 0;
-    }
-
-    /* 물고기 단어 카드 */
-    .fish-word {
-      position: relative;
-      cursor: pointer;
-      transition: transform .2s;
-      user-select: none;
-    }
-    .fish-word:hover { transform: scale(1.08) rotate(-2deg); }
-    .fish-word.taken { opacity: .35; cursor: default; pointer-events: none; }
-    .fish-word.taken:hover { transform: none; }
-    .fish-word.selecting { animation: wiggle .3s ease; }
-    @keyframes wiggle {
-      0%,100%{transform:rotate(0)} 25%{transform:rotate(-6deg)} 75%{transform:rotate(6deg)}
-    }
-
-    .fish-svg { display: block; }
-    .fish-text {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: .78rem;
-      font-weight: 700;
-      color: #fff;
-      text-shadow: 0 1px 3px rgba(0,0,0,.6);
-      white-space: nowrap;
-      pointer-events: none;
-      max-width: 80px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-align: center;
-    }
-    .fish-count-badge {
-      position: absolute;
-      top: -4px; right: -4px;
-      background: var(--gold);
-      color: #0a2342;
-      font-size: .65rem;
-      font-weight: 900;
-      border-radius: 50%;
-      width: 18px; height: 18px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .fish-taken-by {
-      position: absolute;
-      bottom: -2px; left: 50%;
-      transform: translateX(-50%);
-      display: flex; gap: 2px;
-    }
-    .taken-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      border: 1px solid rgba(0,0,0,.3);
-    }
-
-    /* ── 내 물고기통 4개 ── */
-    #tanks {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    .tank {
-      background: rgba(255,255,255,.05);
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: 14px;
-      padding: 10px 10px 12px;
-      min-height: 110px;
-      transition: border .2s;
-      position: relative;
-    }
-    .tank.mine { border-color: rgba(255,214,0,.35); }
-    .tank-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-    .tank-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .tank-name { font-size: .78rem; font-weight: 700; opacity: .85; }
-    .tank-score { margin-left: auto; font-size: .75rem; color: var(--gold); font-weight: 700; }
-    .tank-fish {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-    .tank-fish-item {
-      background: rgba(255,255,255,.1);
-      border-radius: 20px;
-      padding: 3px 10px;
-      font-size: .72rem;
-      font-weight: 600;
-      display: flex; align-items: center; gap: 4px;
-    }
-    .tank-fish-item .tick { color: var(--green); font-size: .8rem; }
-    .tank-fish-item .cross { color: var(--coral); font-size: .8rem; }
-    .tank-empty { font-size: .72rem; opacity: .35; font-style: italic; }
-
-    /* 시스템 로그 */
-    #log {
-      max-width: 600px;
-      margin: 14px auto 0;
-      background: rgba(0,0,0,.2);
-      border-radius: 12px;
-      padding: 10px 14px;
-      max-height: 100px;
-      overflow-y: auto;
-      font-size: .75rem;
-      opacity: .8;
-    }
-    .log-line { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
-    .log-line:last-child { border: none; }
-
-    /* ── 게임 끝 ── */
-    #result {
-      display: none;
-      text-align: center;
-      padding: 40px 20px;
-    }
-    #result h2 { font-size: 2rem; font-weight: 900; margin-bottom: 6px; }
-    #result .winner-name { font-size: 1.2rem; color: var(--gold); }
-    #result-list { margin: 20px auto; max-width: 300px; }
-    .result-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 8px 14px;
-      border-radius: 10px;
-      margin-bottom: 6px;
-      background: rgba(255,255,255,.07);
-    }
-    .result-row.first { background: rgba(255,214,0,.15); border: 1px solid var(--gold); }
-
-    /* 토스트 */
-    #toast {
-      position: fixed;
-      bottom: 24px; left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: rgba(20,40,80,.95);
-      border: 1px solid rgba(255,255,255,.2);
-      border-radius: 12px;
-      padding: 12px 24px;
-      font-size: .9rem;
-      font-weight: 600;
-      transition: transform .3s ease;
-      z-index: 999;
-      text-align: center;
-      max-width: 320px;
-    }
-    #toast.show { transform: translateX(-50%) translateY(0); }
-
-    /* ── 버블 장식 ── */
-    .bubble {
-      position: fixed;
-      border-radius: 50%;
-      background: rgba(100,180,255,.06);
-      pointer-events: none;
-      animation: rise linear infinite;
-    }
-    @keyframes rise {
-      from { transform: translateY(100vh) scale(0); opacity: 0; }
-      10%  { opacity: 1; }
-      90%  { opacity: .6; }
-      to   { transform: translateY(-20vh) scale(1); opacity: 0; }
-    }
-
-    /* 반응형 */
-    @media (max-width: 420px) {
-      header h1 { font-size: 1.5rem; }
-      #tanks { grid-template-columns: 1fr 1fr; gap: 7px; }
-      .fish-text { font-size: .7rem; max-width: 65px; }
-    }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>🎣 단어낚시 게임</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;900&display=swap');
+:root{
+  --deep:#0a2342;--mid:#0d3b6e;
+  --gold:#ffd600;--coral:#ff5252;--green:#00c853;
+  --p1:#ff7043;--p2:#ab47bc;--p3:#26a69a;--p4:#42a5f5;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans KR',sans-serif;background:linear-gradient(180deg,var(--deep) 0%,var(--mid) 60%,#1a237e 100%);min-height:100vh;color:#e3f2fd;overflow-x:hidden;}
+header{text-align:center;padding:14px 20px 8px;}
+header h1{font-size:1.8rem;font-weight:900;text-shadow:0 2px 12px rgba(0,0,0,.5);}
+header h1 span{color:var(--gold);}
+#room-info{font-size:.78rem;opacity:.65;margin-top:3px;}
+.btn{padding:10px 20px;border-radius:12px;border:none;font-family:inherit;font-size:.95rem;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;}
+.btn:active{transform:scale(.96);}
+.btn-primary{background:linear-gradient(135deg,#ffd600,#ff8f00);color:#0a2342;box-shadow:0 4px 16px rgba(255,214,0,.3);}
+.btn-secondary{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);}
+.btn-ghost{background:transparent;color:var(--gold);border:1px solid var(--gold);}
+.btn-danger{background:rgba(255,82,82,.2);color:#ff5252;border:1px solid rgba(255,82,82,.4);}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+.inp{width:100%;padding:9px 13px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-family:inherit;font-size:.95rem;outline:none;transition:border .2s;}
+.inp:focus{border-color:var(--gold);}
+.inp::placeholder{color:rgba(255,255,255,.35);}
+/* 로비 */
+#lobby{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:82vh;padding:20px;}
+.lobby-card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:18px;padding:26px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;}
+.lobby-card h2{font-size:1.25rem;font-weight:800;text-align:center;}
+.lobby-card label{font-size:.82rem;font-weight:600;opacity:.75;margin-bottom:-5px;}
+#lobby-msg{font-size:.8rem;color:#ff8a65;text-align:center;min-height:18px;}
+/* 설정 */
+#setup{display:none;padding:10px 12px 24px;max-width:680px;margin:0 auto;}
+.setup-section{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:16px 18px;margin-bottom:14px;}
+.setup-section h3{font-size:.95rem;font-weight:800;margin-bottom:12px;}
+.round-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.round-tab{padding:7px 16px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;}
+.round-tab.active{background:var(--gold);color:#0a2342;border-color:var(--gold);}
+.round-tab.has-data{border-color:rgba(0,200,83,.5);color:rgba(0,200,83,.9);}
+.round-tab.active.has-data{background:var(--gold);color:#0a2342;border-color:var(--gold);}
+.word-row{display:flex;gap:7px;align-items:center;margin-bottom:8px;}
+.word-row .del-btn{background:rgba(255,82,82,.2);border:none;color:#ff5252;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem;flex-shrink:0;}
+.word-row .del-btn:hover{background:rgba(255,82,82,.4);}
+.answer-row{display:flex;align-items:center;gap:8px;margin-top:10px;background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.2);border-radius:10px;padding:10px 12px;flex-wrap:wrap;}
+.answer-row label{font-size:.8rem;opacity:.7;white-space:nowrap;}
+#preview-pond{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:36px;}
+.preview-chip{background:rgba(255,255,255,.1);border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:4px;}
+.preview-chip .cnt{background:var(--gold);color:#0a2342;border-radius:50%;width:17px;height:17px;font-size:.65rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+/* 대기실 */
+#waiting-room{display:none;text-align:center;padding:40px 20px;}
+#waiting-room h2{font-size:1.2rem;font-weight:700;margin-bottom:8px;}
+#waiting-players{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:16px 0;}
+.waiting-chip{padding:8px 18px;border-radius:20px;font-size:.85rem;font-weight:700;border:2px solid;}
+/* 게임 */
+#game{display:none;padding:0 10px 24px;}
+#round-bar{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px auto 10px;max-width:600px;flex-wrap:wrap;}
+.round-pip{width:27px;height:27px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);transition:all .3s;}
+.round-pip.done{background:var(--green);border-color:var(--green);color:#fff;}
+.round-pip.active{background:var(--gold);border-color:var(--gold);color:#0a2342;box-shadow:0 0 10px rgba(255,214,0,.5);}
+#scoreboard{display:flex;justify-content:center;gap:8px;margin:4px auto 10px;flex-wrap:wrap;max-width:600px;}
+.score-chip{display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;font-size:.8rem;font-weight:700;background:rgba(255,255,255,.08);border:2px solid transparent;}
+.score-chip.me{border-color:var(--gold);}
+.score-chip .dot{width:9px;height:9px;border-radius:50%;}
+#host-game-panel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px 16px;margin:0 auto 12px;max-width:600px;display:none;}
+#host-game-panel h3{font-size:.88rem;font-weight:800;margin-bottom:10px;opacity:.8;}
+.hrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+#round-display{text-align:center;margin:0 auto 12px;max-width:600px;}
+.prompt-box{background:linear-gradient(135deg,rgba(255,214,0,.15),rgba(255,143,0,.1));border:1px solid rgba(255,214,0,.4);border-radius:14px;padding:13px 20px;display:inline-block;min-width:200px;}
+.prompt-label{font-size:.72rem;opacity:.65;margin-bottom:3px;}
+.prompt-text{font-size:1.4rem;font-weight:900;color:var(--gold);}
+.prompt-sub{font-size:.75rem;opacity:.6;margin-top:2px;}
+#pond{position:relative;max-width:600px;margin:0 auto 14px;min-height:200px;background:radial-gradient(ellipse at 50% 60%,rgba(21,101,192,.4) 0%,rgba(10,35,66,.6) 100%);border-radius:20px;border:1px solid rgba(30,136,229,.3);overflow:hidden;padding:12px;}
+#pond::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,rgba(100,180,255,.5),transparent);animation:shimmer 3s infinite;}
+@keyframes shimmer{0%,100%{opacity:.3}50%{opacity:1}}
+#pond-label{font-size:.7rem;font-weight:700;opacity:.45;text-align:center;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;}
+#fish-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;}
+.fish-word{position:relative;cursor:pointer;transition:transform .2s;user-select:none;}
+.fish-word:hover{transform:scale(1.1) rotate(-2deg);}
+.fish-word.taken{opacity:.28;cursor:default;pointer-events:none;}
+.fish-word.my-taken{opacity:.55;cursor:default;pointer-events:none;filter:brightness(.65);}
+.fish-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:.76rem;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7);white-space:nowrap;pointer-events:none;max-width:82px;overflow:hidden;text-overflow:ellipsis;text-align:center;}
+.fish-count-badge{position:absolute;top:-3px;right:-3px;background:var(--gold);color:#0a2342;font-size:.6rem;font-weight:900;border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;}
+.fish-taken-dots{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);display:flex;gap:2px;}
+.taken-dot{width:7px;height:7px;border-radius:50%;border:1px solid rgba(0,0,0,.3);}
+#tanks{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:600px;margin:0 auto;}
+.tank{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:9px 10px 11px;min-height:90px;}
+.tank.mine{border-color:rgba(255,214,0,.35);}
+.tank-header{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+.tank-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.tank-name{font-size:.75rem;font-weight:700;opacity:.85;}
+.tank-score{margin-left:auto;font-size:.72rem;color:var(--gold);font-weight:700;}
+.tank-fish{display:flex;flex-wrap:wrap;gap:4px;}
+.tank-item{background:rgba(255,255,255,.1);border-radius:20px;padding:3px 9px;font-size:.7rem;font-weight:600;display:flex;align-items:center;gap:3px;}
+.tank-item.correct{background:rgba(0,200,83,.15);border:1px solid rgba(0,200,83,.35);}
+.tank-item.wrong{opacity:.5;text-decoration:line-through;}
+.tick{color:var(--green);}.cross{color:var(--coral);}
+.tank-empty{font-size:.7rem;opacity:.3;font-style:italic;}
+#log{max-width:600px;margin:12px auto 0;background:rgba(0,0,0,.2);border-radius:12px;padding:8px 13px;max-height:85px;overflow-y:auto;font-size:.72rem;opacity:.75;}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+#result{display:none;text-align:center;padding:40px 20px;}
+#result h2{font-size:1.8rem;font-weight:900;margin-bottom:6px;}
+.winner-name{font-size:1.1rem;color:var(--gold);margin-bottom:20px;}
+#result-list{max-width:280px;margin:0 auto 20px;}
+.result-row{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-radius:10px;margin-bottom:6px;background:rgba(255,255,255,.07);}
+.result-row.first{background:rgba(255,214,0,.15);border:1px solid var(--gold);}
+#round-result-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;align-items:center;justify-content:center;}
+#round-result-overlay.open{display:flex;}
+#round-result-box{background:linear-gradient(160deg,#0d2d5a,#0a1f3e);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:28px;max-width:400px;width:90%;text-align:center;}
+#round-result-box h3{font-size:1.1rem;font-weight:800;margin-bottom:4px;}
+.rr-answer{font-size:1.7rem;font-weight:900;color:var(--gold);margin:10px 0;}
+.rr-winners{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0;}
+.rr-chip{padding:6px 16px;border-radius:20px;font-size:.85rem;font-weight:700;border:2px solid;}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:rgba(10,30,70,.97);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:11px 22px;font-size:.88rem;font-weight:600;transition:transform .3s;z-index:999;text-align:center;max-width:300px;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+.bubble{position:fixed;border-radius:50%;background:rgba(100,180,255,.05);pointer-events:none;animation:rise linear infinite;}
+@keyframes rise{from{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:1}90%{opacity:.5}to{transform:translateY(-20vh) scale(1);opacity:0}}
+@media(max-width:420px){header h1{font-size:1.4rem;}#tanks{gap:6px;}.fish-text{font-size:.68rem;max-width:68px;}}
+</style>
 </head>
 <body>
-
-<!-- 배경 버블 -->
 <div id="bubbles"></div>
-
 <header>
   <h1>🎣 단어<span>낚시</span></h1>
   <div id="room-info">반려동물 보험 에디션</div>
 </header>
 
-<!-- ── 로비 ── -->
+<!-- 로비 -->
 <div id="lobby">
   <div class="lobby-card">
     <h2>🐠 게임 입장</h2>
-
     <label>닉네임</label>
-    <input id="nickname" type="text" placeholder="예: 강아지사랑" maxlength="8" />
-
+    <input class="inp" id="nickname" placeholder="예: 강아지사랑" maxlength="8"/>
     <label>방 코드</label>
-    <input id="room-code" type="text" placeholder="예: FISH01" maxlength="8" style="text-transform:uppercase" />
-
+    <input class="inp" id="room-code" placeholder="예: FISH01" maxlength="8" style="text-transform:uppercase"/>
     <div style="display:flex;gap:8px;margin-top:4px;">
-      <button class="btn btn-primary" style="flex:1" onclick="joinRoom()">입장하기</button>
-      <button class="btn btn-secondary" style="flex:1" onclick="createRoom()">방 만들기</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="joinRoom()">입장하기</button>
+      <button class="btn btn-primary" style="flex:1" onclick="goSetup()">방 만들기</button>
     </div>
-    <div id="lobby-msg" style="font-size:.8rem;color:#ff8a65;text-align:center;min-height:18px;"></div>
+    <div id="lobby-msg"></div>
   </div>
 </div>
 
-<!-- ── 게임 화면 ── -->
-<div id="game">
-
-  <!-- 스코어보드 -->
-  <div id="scoreboard"></div>
-
-  <!-- 방장 입력 패널 -->
-  <div id="host-panel">
-    <h3>🎯 방장 컨트롤</h3>
-    <div class="row">
-      <input id="prompt-word" placeholder="제시어 (예: 보험)" />
-      <select id="prompt-count">
-        <option value="1">×1 희귀</option>
-        <option value="2">×2</option>
-        <option value="3" selected>×3</option>
-        <option value="4">×4 다다익선</option>
-      </select>
-      <button class="btn btn-primary" onclick="issuePrompt()">출제!</button>
-    </div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-ghost" style="font-size:.8rem" onclick="revealAnswers()">정답 공개</button>
-      <button class="btn btn-secondary" style="font-size:.8rem" onclick="endGame()">게임 종료</button>
+<!-- 설정 화면 -->
+<div id="setup">
+  <div class="setup-section">
+    <h3>⚙️ 기본 설정</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;">
+        <div style="font-size:.78rem;opacity:.6;margin-bottom:5px;">방장 닉네임</div>
+        <input class="inp" id="setup-nick" placeholder="예: 선생님"/>
+      </div>
+      <div style="flex:1;min-width:110px;">
+        <div style="font-size:.78rem;opacity:.6;margin-bottom:5px;">방 코드</div>
+        <input class="inp" id="setup-code" placeholder="예: FISH01" style="text-transform:uppercase" maxlength="8"/>
+      </div>
     </div>
   </div>
+  <div class="setup-section">
+    <h3>🎯 라운드별 설정 <span style="font-size:.75rem;opacity:.45;font-weight:400">(최대 5라운드)</span></h3>
+    <div class="round-tabs" id="round-tabs"></div>
+    <div id="round-settings"></div>
+  </div>
+  <div class="setup-section">
+    <h3>🌊 현재 라운드 낚시터 미리보기</h3>
+    <div id="preview-pond"></div>
+  </div>
+  <div style="display:flex;gap:10px;">
+    <button class="btn btn-secondary" onclick="showLobby()">← 취소</button>
+    <button class="btn btn-primary" style="flex:1" onclick="createRoom()">🚀 대기실 열기</button>
+  </div>
+</div>
 
-  <!-- 현재 제시어 -->
+<!-- 대기실 -->
+<div id="waiting-room">
+  <div style="font-size:2.5rem">🎣</div>
+  <h2>대기 중...</h2>
+  <div style="font-size:.85rem;opacity:.6;margin-bottom:3px;">방 코드: <strong id="wr-code" style="color:var(--gold)"></strong></div>
+  <div style="font-size:.78rem;opacity:.45;margin-bottom:14px;">친구들에게 방 코드를 알려주세요!</div>
+  <div id="waiting-players"></div>
+  <div id="wr-host-btn" style="display:none;margin-top:16px;">
+    <button class="btn btn-primary" onclick="startGame()">▶ 게임 시작!</button>
+  </div>
+  <div id="wr-player-msg" style="font-size:.82rem;opacity:.45;margin-top:12px;display:none;">방장이 시작하면 자동으로 이동합니다</div>
+</div>
+
+<!-- 게임 -->
+<div id="game">
+  <div id="round-bar"></div>
+  <div id="scoreboard"></div>
+  <div id="host-game-panel">
+    <h3>🎯 방장 컨트롤 — <span id="hg-round-label"></span></h3>
+    <div style="margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap;">
+      <div style="font-size:.82rem;">제시어: <strong id="hg-prompt" style="color:var(--gold)"></strong></div>
+      <div style="font-size:.82rem;">정답: <strong id="hg-answer" style="color:#ff8a65"></strong></div>
+    </div>
+    <div class="hrow">
+      <button class="btn btn-primary" style="font-size:.85rem" onclick="revealAnswer()">✅ 정답 공개</button>
+      <button class="btn btn-ghost" style="font-size:.85rem" id="next-round-btn" onclick="nextRound()" disabled>다음 라운드 →</button>
+      <button class="btn btn-danger" style="font-size:.78rem" onclick="endGame()">게임 종료</button>
+    </div>
+  </div>
   <div id="round-display">
     <div class="prompt-box" id="prompt-box" style="display:none">
-      <div class="prompt-label">🎯 지금 찾아야 할 단어</div>
+      <div class="prompt-label">🎯 이 단어를 낚시터에서 찾아요!</div>
       <div class="prompt-text" id="prompt-text"></div>
-      <div class="prompt-count" id="prompt-count-text"></div>
+      <div class="prompt-sub" id="prompt-sub"></div>
     </div>
-    <div id="waiting-text" style="opacity:.5;font-size:.9rem;margin-top:10px;">방장의 제시어를 기다리는 중…</div>
+    <div id="waiting-prompt" style="opacity:.5;font-size:.88rem;margin-top:8px;text-align:center;display:none;">라운드 시작을 기다리는 중…</div>
   </div>
-
-  <!-- 중앙 낚시터 -->
   <div id="pond">
-    <div id="pond-label">🌊 낚시터 — 단어를 클릭해서 내 통에 넣기</div>
+    <div id="pond-label">🌊 낚시터 — 단어를 클릭해 내 통에 넣기</div>
     <div id="fish-grid"></div>
   </div>
-
-  <!-- 내 물고기통 -->
   <div id="tanks"></div>
-
-  <!-- 로그 -->
-  <div id="log"><div class="log-line" style="opacity:.4">게임 로그가 여기에 표시됩니다.</div></div>
+  <div id="log"><div class="log-line" style="opacity:.3;">게임 로그</div></div>
 </div>
 
-<!-- 결과 화면 -->
+<!-- 결과 -->
 <div id="result">
   <div style="font-size:3rem">🏆</div>
   <h2>게임 종료!</h2>
   <div class="winner-name" id="winner-name"></div>
   <div id="result-list"></div>
-  <button class="btn btn-primary" style="margin-top:10px" onclick="location.reload()">다시 하기</button>
+  <button class="btn btn-primary" onclick="location.reload()">다시 하기</button>
 </div>
 
-<!-- 토스트 -->
+<!-- 라운드 결과 오버레이 -->
+<div id="round-result-overlay">
+  <div id="round-result-box">
+    <h3 id="rr-title"></h3>
+    <div class="rr-answer" id="rr-answer"></div>
+    <div style="font-size:.8rem;opacity:.6;margin-bottom:6px;" id="rr-desc"></div>
+    <div class="rr-winners" id="rr-winners"></div>
+    <div id="rr-btn-area" style="margin-top:14px;"></div>
+  </div>
+</div>
 <div id="toast"></div>
 
-<!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, push, onValue, update, remove }
+import { getDatabase, ref, set, get, onValue, update }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-/* ════════════════════════════════════════════════════
-   🔧 여기에 본인의 Firebase 설정값을 넣으세요!
-   Firebase Console → 프로젝트 설정 → 웹 앱 → firebaseConfig
-   ════════════════════════════════════════════════════ */
 const firebaseConfig = {
-  apiKey:            "AIzaSyBFRDIlJ4UC0wqhp1uqVExtSYQJiRlt5iA",
-  authDomain:        "fishing-9f25f.firebaseapp.com",
-  databaseURL:       "https://fishing-9f25f-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "fishing-9f25f",
-  storageBucket:     "fishing-9f25f.firebasestorage.app",
-  messagingSenderId: "603443829496",
-  appId:             "1:603443829496:web:3dd987effb6f8302d7f90d"
+  apiKey:"AIzaSyBFRDIlJ4UC0wqhp1uqVExtSYQJiRlt5iA",
+  authDomain:"fishing-9f25f.firebaseapp.com",
+  databaseURL:"https://fishing-9f25f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"fishing-9f25f",
+  storageBucket:"fishing-9f25f.firebasestorage.app",
+  messagingSenderId:"603443829496",
+  appId:"1:603443829496:web:3dd987effb6f8302d7f90d"
 };
-/* ════════════════════════════════════════════════════ */
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
 
-const app = initializeApp(firebaseConfig);
-const db  = getDatabase(app);
-
-// ── 기사 단어 목록 ──
-const ARTICLE_WORDS = [
-  "반려동물","가족","치료","병원","수술","치료비","슬개골","탈구",
-  "심장병","부담","보호자","보험","가입","보장","MRI","치과",
-  "입원비","전문가","건강","병원비","걱정","강아지","수백만원","무릎",
-  "질환","매달","납부","혜택","보험료","펫보험"
+const DEFAULT_WORDS=[
+  {word:"반려동물",count:3},{word:"가족",count:4},{word:"치료",count:2},{word:"병원",count:3},
+  {word:"수술",count:2},{word:"치료비",count:1},{word:"슬개골",count:2},{word:"심장병",count:1},
+  {word:"보호자",count:3},{word:"보험",count:4},{word:"가입",count:2},{word:"보장",count:2}
 ];
-
-// 플레이어 색상
-const PLAYER_COLORS = ["#ff7043","#ab47bc","#26a69a","#42a5f5"];
-
-// 물고기 SVG 색상 팔레트 (물고기별로 다양)
-const FISH_COLORS = [
+const PLAYER_COLORS=["#ff7043","#ab47bc","#26a69a","#42a5f5"];
+const FISH_COLORS=[
   ["#0d47a1","#1565c0"],["#1b5e20","#2e7d32"],["#4a148c","#6a1b9a"],
   ["#bf360c","#d84315"],["#006064","#00838f"],["#827717","#9e9d24"],
   ["#880e4f","#ad1457"],["#01579b","#0277bd"],["#33691e","#558b2f"],
-  ["#3e2723","#5d4037"]
+  ["#3e2723","#5d4037"],["#1a237e","#283593"],["#004d40","#00695c"]
 ];
 
-// ── 상태 ──
-let roomId, playerId, playerName, isHost;
-let gameState = {};
+let roomId,playerId,playerName,isHost;
+let gameState={};
+let curSetupRound=0;
+let roundConfigs=Array.from({length:5},(_,i)=>({
+  words: i===0 ? DEFAULT_WORDS.map(w=>({...w})) : [],
+  prompt: i===0 ? '치료비 관련 단어는?' : '',
+  answer: i===0 ? '치료비' : ''
+}));
 
-// ── 유틸 ──
-const $ = id => document.getElementById(id);
-function toast(msg, dur=2500) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), dur);
-}
-function addLog(msg) {
-  const log = $('log');
-  const d = document.createElement('div');
-  d.className = 'log-line';
-  d.textContent = `[${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}] ${msg}`;
-  log.prepend(d);
-  while (log.children.length > 30) log.removeChild(log.lastChild);
+const $=id=>document.getElementById(id);
+function toast(msg,dur=2500){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
+function addLog(msg){const log=$('log');const d=document.createElement('div');d.className='log-line';d.textContent=`[${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}] ${msg}`;log.prepend(d);while(log.children.length>40)log.removeChild(log.lastChild);}
+function showOnly(id){['lobby','setup','waiting-room','game','result'].forEach(s=>{const el=$(s);if(el)el.style.display='none';});const el=$(id);if(el)el.style.display=id==='lobby'?'flex':'block';}
+
+/* ── 설정 화면 ── */
+window.showLobby=()=>showOnly('lobby');
+window.goSetup=function(){showOnly('setup');renderSetupTabs();renderSetupRound(curSetupRound);};
+
+function renderSetupTabs(){
+  const tabs=$('round-tabs');tabs.innerHTML='';
+  for(let i=0;i<5;i++){
+    const cfg=roundConfigs[i];
+    const hasData=cfg.words.filter(w=>w.word.trim()).length>0;
+    const t=document.createElement('div');
+    t.className='round-tab'+(i===curSetupRound?' active':'')+(hasData?' has-data':'');
+    t.textContent=`${i+1}라운드${hasData?' ✓':''}`;
+    t.onclick=(()=>{const ri=i;return()=>{curSetupRound=ri;renderSetupTabs();renderSetupRound(ri);};})();
+    tabs.appendChild(t);
+  }
 }
 
-// ── 물고기 SVG 생성 ──
-function makeFishSVG(word, colorPair, size=100) {
-  const [c1,c2] = colorPair;
-  const w = size, h = size * 0.55;
-  return `<svg class="fish-svg" width="${w}" height="${h}" viewBox="0 0 100 55" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="fg${word}" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="${c1}"/>
-        <stop offset="100%" stop-color="${c2}"/>
-      </linearGradient>
-    </defs>
-    <!-- 꼬리 -->
+function renderSetupRound(ri){
+  const cfg=roundConfigs[ri];
+  const c=$('round-settings');c.innerHTML='';
+
+  // 단어 섹션
+  const ws=document.createElement('div');
+  ws.innerHTML='<div style="font-size:.78rem;opacity:.6;margin-bottom:8px;">📌 낚시터에 풀 단어 &amp; 개수 <span style="opacity:.65">(1~4, 개수만큼 여러 명이 낚을 수 있어요)</span></div>';
+
+  cfg.words.forEach((entry,idx)=>{
+    const row=document.createElement('div');row.className='word-row';
+    row.innerHTML=`<input class="inp" placeholder="단어" value="${entry.word||''}" style="flex:2" oninput="updateWord(${ri},${idx},'word',this.value)"/>
+      <input class="inp" type="number" min="1" max="4" value="${entry.count||2}" style="width:60px;text-align:center" oninput="updateWord(${ri},${idx},'count',this.value)"/>
+      <span style="font-size:.7rem;opacity:.4;white-space:nowrap">개</span>
+      <button class="del-btn" onclick="removeWord(${ri},${idx})">✕</button>`;
+    ws.appendChild(row);
+  });
+
+  const ab=document.createElement('button');ab.className='btn btn-secondary';ab.style.cssText='font-size:.82rem;padding:7px 14px;margin-top:4px;';
+  ab.textContent='+ 단어 추가';ab.onclick=()=>{roundConfigs[ri].words.push({word:'',count:2});renderSetupRound(ri);renderSetupTabs();};
+  ws.appendChild(ab);c.appendChild(ws);
+
+  // 제시어/정답
+  const ar=document.createElement('div');ar.className='answer-row';
+  ar.innerHTML=`<label>🎯 제시어</label>
+    <input class="inp" placeholder="힌트 문구 (예: 비용 관련 단어?)" value="${cfg.prompt||''}" style="flex:1;min-width:120px" oninput="updateMeta(${ri},'prompt',this.value)"/>
+    <label style="margin-left:6px">✅ 정답</label>
+    <input class="inp" placeholder="정답 단어" value="${cfg.answer||''}" style="flex:1;min-width:80px" oninput="updateMeta(${ri},'answer',this.value)"/>`;
+  c.appendChild(ar);
+  updatePreview(ri);
+}
+
+window.updateWord=function(ri,idx,key,val){
+  roundConfigs[ri].words[idx][key]=key==='count'?Math.max(1,Math.min(4,parseInt(val)||1)):val;
+  updatePreview(ri);renderSetupTabs();
+};
+window.removeWord=function(ri,idx){roundConfigs[ri].words.splice(idx,1);renderSetupRound(ri);};
+window.updateMeta=function(ri,key,val){roundConfigs[ri][key]=val;};
+
+function updatePreview(ri){
+  const pond=$('preview-pond');pond.innerHTML='';
+  roundConfigs[ri].words.forEach(e=>{
+    if(!e.word.trim())return;
+    const chip=document.createElement('div');chip.className='preview-chip';
+    chip.innerHTML=`${e.word}<span class="cnt">${e.count||2}</span>`;
+    pond.appendChild(chip);
+  });
+}
+
+/* ── 방 만들기 ── */
+window.createRoom=async function(){
+  const nn=$('setup-nick').value.trim();
+  const rc=$('setup-code').value.trim().toUpperCase()||'FISH'+Math.random().toString(36).slice(2,6).toUpperCase();
+  if(!nn){toast('방장 닉네임을 입력하세요!');return;}
+  const validRounds=roundConfigs.filter(cfg=>cfg.words.filter(w=>w.word.trim()).length>0);
+  if(validRounds.length===0){toast('최소 1개 라운드에 단어를 입력하세요!');return;}
+
+  roomId=rc;playerId='host_'+Date.now();playerName=nn;isHost=true;
+  const rounds={};
+  validRounds.forEach((cfg,ri)=>{
+    const wp={};
+    cfg.words.filter(w=>w.word.trim()).forEach(e=>{wp[e.word.trim()]={count:parseInt(e.count)||2,takenBy:{}};});
+    rounds[ri]={wordPool:wp,prompt:cfg.prompt||`${ri+1}라운드 제시어`,answer:cfg.answer||'',revealed:false};
+  });
+  await set(ref(db,`rooms/${roomId}`),{
+    host:playerId,hostName:nn,status:'waiting',
+    currentRound:0,totalRounds:validRounds.length,rounds,players:{}
+  });
+  enterWaitingRoom();
+};
+
+/* ── 입장 ── */
+window.joinRoom=async function(){
+  const nn=$('nickname').value.trim();
+  const rc=$('room-code').value.trim().toUpperCase();
+  if(!nn){$('lobby-msg').textContent='닉네임을 입력하세요';return;}
+  if(!rc){$('lobby-msg').textContent='방 코드를 입력하세요';return;}
+  const snap=await get(ref(db,`rooms/${rc}`));
+  if(!snap.exists()){$('lobby-msg').textContent='존재하지 않는 방입니다';return;}
+  const data=snap.val();
+  const cnt=Object.keys(data.players||{}).length;
+  if(cnt>=3){$('lobby-msg').textContent='참여자가 꽉 찼습니다 (최대 3명)';return;}
+  if(data.status==='ended'){$('lobby-msg').textContent='이미 종료된 게임입니다';return;}
+  roomId=rc;playerId='p_'+Date.now();playerName=nn;isHost=false;
+  await update(ref(db,`rooms/${roomId}/players/${playerId}`),{name:nn,score:0,color:PLAYER_COLORS[cnt],tank:{}});
+  enterWaitingRoom();
+};
+
+/* ── 대기실 ── */
+function enterWaitingRoom(){
+  showOnly('waiting-room');
+  $('wr-code').textContent=roomId;
+  $('room-info').textContent=`방 코드: ${roomId}  |  ${playerName}${isHost?' (방장)':''}`;
+  if(isHost)$('wr-host-btn').style.display='block';
+  else $('wr-player-msg').style.display='block';
+  onValue(ref(db,`rooms/${roomId}`),snap=>{
+    if(!snap.exists())return;
+    gameState=snap.val();
+    renderWaitingPlayers();
+    if(gameState.status==='playing')enterGame();
+    if(gameState.status==='ended')showResultScreen();
+  });
+}
+function renderWaitingPlayers(){
+  const c=$('waiting-players');c.innerHTML='';
+  const hc=document.createElement('div');hc.className='waiting-chip';
+  hc.style.cssText='border-color:#ffd600;color:#ffd600;background:rgba(255,214,0,.1)';
+  hc.textContent=`👑 ${gameState.hostName||'방장'}`;c.appendChild(hc);
+  Object.values(gameState.players||{}).forEach(p=>{
+    const chip=document.createElement('div');chip.className='waiting-chip';
+    chip.style.cssText=`border-color:${p.color};color:${p.color};background:rgba(0,0,0,.15)`;
+    chip.textContent=`🐟 ${p.name}`;c.appendChild(chip);
+  });
+}
+window.startGame=async function(){await update(ref(db,`rooms/${roomId}`),{status:'playing',currentRound:0});};
+
+/* ── 게임 ── */
+function enterGame(){
+  showOnly('game');
+  $('host-game-panel').style.display=isHost?'block':'none';
+  onValue(ref(db,`rooms/${roomId}`),snap=>{
+    if(!snap.exists())return;
+    gameState=snap.val();
+    renderRoundBar();renderScoreboard();renderPond();renderTanks();
+    renderPromptDisplay();updateHostPanel();
+    if(gameState.status==='ended')showResultScreen();
+  });
+}
+
+function renderRoundBar(){
+  const bar=$('round-bar');bar.innerHTML='';
+  const total=gameState.totalRounds||1,cur=gameState.currentRound||0;
+  for(let i=0;i<total;i++){
+    const pip=document.createElement('div');
+    pip.className='round-pip'+(i<cur?' done':i===cur?' active':'');
+    pip.textContent=i+1;bar.appendChild(pip);
+  }
+  const lbl=document.createElement('div');lbl.style.cssText='font-size:.73rem;opacity:.5;margin-left:4px;';
+  lbl.textContent=`${cur+1}/${total} 라운드`;bar.appendChild(lbl);
+}
+function renderScoreboard(){
+  const board=$('scoreboard');board.innerHTML='';
+  const hc=document.createElement('div');hc.className='score-chip';
+  hc.innerHTML=`<span class="dot" style="background:#ffd600"></span><span>👑 ${gameState.hostName||'방장'}</span>`;
+  board.appendChild(hc);
+  Object.entries(gameState.players||{}).forEach(([pid,p])=>{
+    const chip=document.createElement('div');chip.className='score-chip'+(pid===playerId?' me':'');
+    chip.innerHTML=`<span class="dot" style="background:${p.color}"></span><span>${p.name}</span><span style="color:${p.color};margin-left:3px">${p.score||0}점</span>`;
+    board.appendChild(chip);
+  });
+}
+function getCurRound(){const ri=gameState.currentRound||0;return(gameState.rounds||{})[ri]||{};}
+
+function renderPromptDisplay(){
+  const rd=getCurRound();
+  const box=$('prompt-box'),wp=$('waiting-prompt');
+  if(rd.prompt){
+    box.style.display='inline-block';wp.style.display='none';
+    $('prompt-text').textContent=`"${rd.prompt}"`;
+    $('prompt-sub').textContent=rd.revealed?`정답: ${rd.answer||'?'} | 방장이 다음 라운드를 시작합니다`:`관련 단어를 낚시터에서 찾아보세요!`;
+  } else {
+    box.style.display='none';wp.style.display='block';
+  }
+}
+function updateHostPanel(){
+  if(!isHost)return;
+  const rd=getCurRound(),ri=gameState.currentRound||0,total=gameState.totalRounds||1;
+  $('hg-round-label').textContent=`${ri+1} / ${total} 라운드`;
+  $('hg-prompt').textContent=rd.prompt||'(없음)';
+  $('hg-answer').textContent=rd.answer||'(없음)';
+  $('next-round-btn').disabled=!rd.revealed;
+  $('next-round-btn').textContent=ri+1>=total?'🏁 결과 보기':'다음 라운드 →';
+}
+
+function renderPond(){
+  const rd=getCurRound(),pool=rd.wordPool||{},grid=$('fish-grid');grid.innerHTML='';
+  Object.entries(pool).forEach(([word,data],i)=>{
+    const takenBy=data.takenBy||{},takenCount=Object.keys(takenBy).length;
+    const myTaken=!isHost&&!!takenBy[playerId],isFull=takenCount>=(data.count||2);
+    const wrapper=document.createElement('div');
+    wrapper.className='fish-word'+(isFull&&!myTaken?' taken':myTaken?' my-taken':'');
+    const cp=FISH_COLORS[i%FISH_COLORS.length],sz=word.length<=3?88:word.length<=5?100:112;
+    wrapper.innerHTML=makeFishSVG(word,i,cp,sz);
+    const lbl=document.createElement('div');lbl.className='fish-text';lbl.textContent=word;wrapper.appendChild(lbl);
+    const badge=document.createElement('div');badge.className='fish-count-badge';badge.textContent=data.count||2;wrapper.appendChild(badge);
+    if(takenCount>0){
+      const dots=document.createElement('div');dots.className='fish-taken-dots';
+      const players=gameState.players||{};
+      Object.keys(takenBy).forEach(pid=>{const dot=document.createElement('div');dot.className='taken-dot';dot.style.background=players[pid]?.color||'#888';dots.appendChild(dot);});
+      wrapper.appendChild(dots);
+    }
+    if(!isHost&&!isFull&&!myTaken&&!rd.revealed)wrapper.onclick=()=>catchFish(word);
+    grid.appendChild(wrapper);
+  });
+}
+
+function makeFishSVG(word,idx,cp,size){
+  const[c1,c2]=cp,h=size*.55,gid='fg'+idx;
+  return `<svg width="${size}" height="${h}" viewBox="0 0 100 55" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="${gid}" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/>
+    </linearGradient></defs>
     <polygon points="8,27 22,14 22,40" fill="${c1}" opacity=".85"/>
-    <!-- 몸통 -->
-    <ellipse cx="58" cy="27" rx="36" ry="20" fill="url(#fg${word})"/>
-    <!-- 지느러미 위 -->
+    <ellipse cx="58" cy="27" rx="36" ry="20" fill="url(#${gid})"/>
     <path d="M45,10 Q55,3 65,10" stroke="${c2}" stroke-width="2" fill="none"/>
-    <!-- 눈 -->
     <circle cx="88" cy="23" r="4" fill="white"/>
     <circle cx="89" cy="23" r="2" fill="#1a237e"/>
-    <!-- 비늘 느낌 -->
     <path d="M50,18 Q55,27 50,36" stroke="rgba(255,255,255,.15)" stroke-width="1.5" fill="none"/>
     <path d="M62,16 Q67,27 62,38" stroke="rgba(255,255,255,.12)" stroke-width="1.5" fill="none"/>
   </svg>`;
 }
 
-// ── 방 만들기 ──
-window.createRoom = async function() {
-  const nn = $('nickname').value.trim();
-  const rc = $('room-code').value.trim().toUpperCase() || 'FISH' + Math.random().toString(36).slice(2,6).toUpperCase();
-  if (!nn) { $('lobby-msg').textContent='닉네임을 입력하세요'; return; }
-
-  roomId = rc;
-  playerId = 'p_' + Date.now();
-  playerName = nn;
-  isHost = true;
-
-  // 단어 풀 생성 (개수 1~4 랜덤)
-  const shuffled = [...ARTICLE_WORDS].sort(() => Math.random()-.5).slice(0, 16);
-  const wordPool = {};
-  shuffled.forEach((w, i) => {
-    wordPool[w] = { count: [1,1,2,2,3,3,4][Math.floor(Math.random()*7)], takenBy: {} };
-  });
-
-  await set(ref(db, `rooms/${roomId}`), {
-    host: playerId,
-    status: 'waiting',
-    wordPool,
-    prompt: null,
-    players: {
-      [playerId]: { name: nn, score: 0, color: PLAYER_COLORS[0], tank: {} }
-    }
-  });
-
-  $('room-code').value = rc;
-  enterGame();
-};
-
-// ── 방 입장 ──
-window.joinRoom = async function() {
-  const nn = $('nickname').value.trim();
-  const rc = $('room-code').value.trim().toUpperCase();
-  if (!nn) { $('lobby-msg').textContent='닉네임을 입력하세요'; return; }
-  if (!rc) { $('lobby-msg').textContent='방 코드를 입력하세요'; return; }
-
-  roomId = rc;
-  const snap = await get(ref(db, `rooms/${roomId}`));
-  if (!snap.exists()) { $('lobby-msg').textContent='존재하지 않는 방입니다'; return; }
-
-  const data = snap.val();
-  const players = data.players || {};
-  const count = Object.keys(players).length;
-  if (count >= 4) { $('lobby-msg').textContent='방이 꽉 찼습니다 (최대 4명)'; return; }
-
-  playerId = 'p_' + Date.now();
-  playerName = nn;
-  isHost = data.host === playerId;
-
-  const color = PLAYER_COLORS[count];
-  await set(ref(db, `rooms/${roomId}/players/${playerId}`), {
-    name: nn, score: 0, color, tank: {}
-  });
-
-  enterGame();
-};
-
-// ── 게임 화면 진입 ──
-function enterGame() {
-  $('lobby').style.display = 'none';
-  $('game').style.display = 'block';
-  $('room-info').textContent = `방 코드: ${roomId}  |  닉네임: ${playerName}`;
-
-  // 리스너
-  onValue(ref(db, `rooms/${roomId}`), snap => {
-    if (!snap.exists()) return;
-    gameState = snap.val();
-
-    // 방장 여부
-    isHost = gameState.host === playerId;
-    $('host-panel').style.display = isHost ? 'block' : 'none';
-
-    renderScoreboard();
-    renderPond();
-    renderTanks();
-    renderPrompt();
-
-    if (gameState.status === 'ended') showResult();
-  });
+async function catchFish(word){
+  const ri=gameState.currentRound||0,rd=getCurRound(),data=(rd.wordPool||{})[word];
+  if(!data)return;
+  const takenBy=data.takenBy||{};
+  if(takenBy[playerId]){toast('이미 내 통에 있어요!');return;}
+  if(Object.keys(takenBy).length>=(data.count||2)){toast('이미 꽉 찼어요!');return;}
+  await update(ref(db,`rooms/${roomId}/rounds/${ri}/wordPool/${word}/takenBy`),{[playerId]:true});
+  await update(ref(db,`rooms/${roomId}/players/${playerId}/tank`),{[word]:{round:ri,correct:null}});
+  addLog(`${playerName}님이 "${word}"를 낚았습니다!`);toast(`🎣 "${word}" 낚음!`);
 }
 
-// ── 스코어보드 ──
-function renderScoreboard() {
-  const players = gameState.players || {};
-  const board = $('scoreboard');
-  board.innerHTML = '';
-  Object.entries(players).forEach(([pid, p]) => {
-    const chip = document.createElement('div');
-    chip.className = 'score-chip' + (pid === playerId ? ' me' : '');
-    chip.innerHTML = `<span class="dot" style="background:${p.color}"></span><span>${p.name}</span><span style="margin-left:4px;color:${p.color}">${p.score}점</span>`;
-    board.appendChild(chip);
-  });
-}
-
-// ── 낚시터 렌더 ──
-function renderPond() {
-  const pool = gameState.wordPool || {};
-  const grid = $('fish-grid');
-  grid.innerHTML = '';
-
-  Object.entries(pool).forEach(([word, data], i) => {
-    const takenBy = data.takenBy || {};
-    const takenCount = Object.keys(takenBy).length;
-    const myTaken = !!takenBy[playerId];
-    const isFull = takenCount >= data.count;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'fish-word' + (isFull ? ' taken' : '');
-    wrapper.dataset.word = word;
-
-    const colorPair = FISH_COLORS[i % FISH_COLORS.length];
-    const size = word.length <= 3 ? 88 : word.length <= 5 ? 100 : 112;
-
-    wrapper.innerHTML = makeFishSVG(word + i, colorPair, size);
-
-    // 단어 텍스트
-    const label = document.createElement('div');
-    label.className = 'fish-text';
-    label.textContent = word;
-    wrapper.appendChild(label);
-
-    // 개수 뱃지
-    const badge = document.createElement('div');
-    badge.className = 'fish-count-badge';
-    badge.textContent = data.count;
-    wrapper.appendChild(badge);
-
-    // 누가 이미 잡았는지 표시
-    if (takenCount > 0) {
-      const dots = document.createElement('div');
-      dots.className = 'fish-taken-by';
-      const players = gameState.players || {};
-      Object.keys(takenBy).forEach(pid => {
-        const dot = document.createElement('div');
-        dot.className = 'taken-dot';
-        dot.style.background = players[pid]?.color || '#888';
-        dots.appendChild(dot);
-      });
-      wrapper.appendChild(dots);
-    }
-
-    if (!isFull && !myTaken) {
-      wrapper.onclick = () => catchFish(word);
-    }
-
-    // 이미 내가 잡은 것 표시
-    if (myTaken) {
-      wrapper.style.filter = 'brightness(.6)';
-      wrapper.style.cursor = 'default';
-    }
-
-    grid.appendChild(wrapper);
-  });
-}
-
-// ── 물고기 잡기 ──
-async function catchFish(word) {
-  const pool = gameState.wordPool || {};
-  const data = pool[word];
-  if (!data) return;
-
-  const takenBy = data.takenBy || {};
-  if (takenBy[playerId]) { toast('이미 내 통에 넣었어요!'); return; }
-  if (Object.keys(takenBy).length >= data.count) { toast('이미 꽉 찼어요!'); return; }
-
-  // 낚시터에서 잡기
-  await update(ref(db, `rooms/${roomId}/wordPool/${word}/takenBy`), { [playerId]: true });
-  // 내 통에 추가 (정답 여부는 나중에 판별)
-  await update(ref(db, `rooms/${roomId}/players/${playerId}/tank`), { [word]: { round: gameState.prompt?.word || '?', correct: null }});
-
-  addLog(`${playerName}님이 "${word}"를 낚았습니다!`);
-  toast(`🎣 "${word}" 낚음!`);
-}
-
-// ── 탱크 렌더 ──
-function renderTanks() {
-  const players = gameState.players || {};
-  const container = $('tanks');
-  container.innerHTML = '';
-
-  // 나 먼저
-  const sortedIds = Object.keys(players).sort(a => a === playerId ? -1 : 1);
-
-  sortedIds.forEach(pid => {
-    const p = players[pid];
-    const tank = document.createElement('div');
-    tank.className = 'tank' + (pid === playerId ? ' mine' : '');
-
-    const header = document.createElement('div');
-    header.className = 'tank-header';
-    header.innerHTML = `
-      <div class="tank-dot" style="background:${p.color}"></div>
-      <div class="tank-name">${pid === playerId ? '🪣 내 통' : p.name}</div>
-      <div class="tank-score">${p.score}점</div>
-    `;
+function renderTanks(){
+  const c=$('tanks');c.innerHTML='';
+  if(isHost)return;
+  const players=gameState.players||{},ri=gameState.currentRound||0;
+  Object.keys(players).sort(a=>a===playerId?-1:1).forEach(pid=>{
+    const p=players[pid];
+    const tank=document.createElement('div');tank.className='tank'+(pid===playerId?' mine':'');
+    const header=document.createElement('div');header.className='tank-header';
+    header.innerHTML=`<div class="tank-dot" style="background:${p.color}"></div><div class="tank-name">${pid===playerId?'🪣 내 통':p.name}</div><div class="tank-score">${p.score||0}점</div>`;
     tank.appendChild(header);
-
-    const fishList = document.createElement('div');
-    fishList.className = 'tank-fish';
-
-    const tankData = p.tank || {};
-    const entries = Object.entries(tankData);
-
-    if (entries.length === 0) {
-      fishList.innerHTML = `<div class="tank-empty">아직 낚은 물고기가 없어요</div>`;
-    } else {
-      entries.forEach(([word, info]) => {
-        const item = document.createElement('div');
-        item.className = 'tank-fish-item';
-        let icon = '';
-        if (info.correct === true) icon = '<span class="tick">✓</span>';
-        else if (info.correct === false) icon = '<span class="cross">✗</span>';
-        item.innerHTML = `${icon}🐟 ${word}`;
-        fishList.appendChild(item);
-      });
-    }
-
-    tank.appendChild(fishList);
-    container.appendChild(tank);
+    const fl=document.createElement('div');fl.className='tank-fish';
+    const entries=Object.entries(p.tank||{}).filter(([,info])=>(info.round||0)===ri);
+    if(!entries.length){fl.innerHTML='<div class="tank-empty">비어있어요</div>';}
+    else entries.forEach(([word,info])=>{
+      const item=document.createElement('div');
+      item.className='tank-item'+(info.correct===true?' correct':info.correct===false?' wrong':'');
+      item.innerHTML=(info.correct===true?'<span class="tick">✓</span>':info.correct===false?'<span class="cross">✗</span>':'')+`🐟 ${word}`;
+      fl.appendChild(item);
+    });
+    tank.appendChild(fl);c.appendChild(tank);
   });
 }
 
-// ── 제시어 렌더 ──
-function renderPrompt() {
-  const prompt = gameState.prompt;
-  const box = $('prompt-box');
-  const waiting = $('waiting-text');
+/* ── 정답 공개 ── */
+window.revealAnswer=async function(){
+  const ri=gameState.currentRound||0,rd=getCurRound(),answer=(rd.answer||'').trim();
+  if(!answer){toast('정답이 설정되지 않았어요!');return;}
+  const players=gameState.players||{},updates={},winners=[];
+  Object.entries(players).forEach(([pid,p])=>{
+    Object.entries(p.tank||{}).forEach(([word,info])=>{
+      if((info.round||0)===ri){
+        const ok=word===answer;
+        updates[`players/${pid}/tank/${word}/correct`]=ok;
+        if(ok){updates[`players/${pid}/score`]=(p.score||0)+10;winners.push({name:p.name,color:p.color});}
+      }
+    });
+  });
+  updates[`rounds/${ri}/revealed`]=true;
+  await update(ref(db,`rooms/${roomId}`),updates);
+  showRoundResult(ri,answer,winners);
+  addLog(`✅ ${ri+1}라운드 정답: "${answer}" | 정답자: ${winners.map(w=>w.name).join(', ')||'없음'}`);
+};
 
-  if (prompt && prompt.active) {
-    box.style.display = 'inline-block';
-    waiting.style.display = 'none';
-    $('prompt-text').textContent = `"${prompt.word}" × ${prompt.count}`;
-    $('prompt-count-text').textContent = `최대 ${prompt.count}명이 정답을 얻을 수 있어요`;
+function showRoundResult(ri,answer,winners){
+  const total=gameState.totalRounds||1;
+  $('rr-title').textContent=`${ri+1}라운드 정답 공개!`;
+  $('rr-answer').textContent=`"${answer}"`;
+  $('rr-desc').textContent=winners.length?`${winners.length}명 정답! 각 +10점`:'아무도 정답을 낚지 못했어요 😢';
+  const wd=$('rr-winners');wd.innerHTML='';
+  winners.forEach(w=>{const c=document.createElement('div');c.className='rr-chip';c.style.cssText=`border-color:${w.color};color:${w.color};background:rgba(0,0,0,.2)`;c.textContent=`🎉 ${w.name}`;wd.appendChild(c);});
+  const ba=$('rr-btn-area');ba.innerHTML='';
+  if(isHost){
+    const btn=document.createElement('button');btn.className='btn btn-primary';
+    btn.textContent=ri+1>=total?'🏁 결과 보기':'다음 라운드 →';
+    btn.onclick=()=>{$('round-result-overlay').classList.remove('open');if(ri+1>=total)endGame();else nextRound();};
+    ba.appendChild(btn);
   } else {
-    box.style.display = 'none';
-    waiting.style.display = 'block';
+    ba.innerHTML='<div style="font-size:.8rem;opacity:.45;">방장이 다음 라운드를 시작합니다…</div>';
   }
+  $('round-result-overlay').classList.add('open');
 }
 
-// ── 방장: 제시어 출제 ──
-window.issuePrompt = async function() {
-  const word = $('prompt-word').value.trim();
-  const count = parseInt($('prompt-count').value);
-  if (!word) { toast('제시어를 입력하세요!'); return; }
-
-  // 해당 단어가 낚시터에 있는지 확인
-  const pool = gameState.wordPool || {};
-  if (!pool[word]) { toast('낚시터에 없는 단어예요. 다시 확인하세요.'); return; }
-
-  await update(ref(db, `rooms/${roomId}`), {
-    prompt: { word, count, active: true, issuedAt: Date.now() }
-  });
-  // 해당 단어의 count를 재설정
-  await update(ref(db, `rooms/${roomId}/wordPool/${word}`), { count });
-
-  addLog(`방장이 제시어 "${word}" (×${count}) 출제!`);
-  $('prompt-word').value = '';
+window.nextRound=async function(){
+  const ri=gameState.currentRound||0,total=gameState.totalRounds||1;
+  if(ri+1>=total){endGame();return;}
+  await update(ref(db,`rooms/${roomId}`),{currentRound:ri+1});
+  $('round-result-overlay').classList.remove('open');
 };
+window.endGame=async function(){await update(ref(db,`rooms/${roomId}`),{status:'ended'});};
 
-// ── 방장: 정답 공개 ──
-window.revealAnswers = async function() {
-  const prompt = gameState.prompt;
-  if (!prompt || !prompt.active) { toast('먼저 제시어를 출제하세요'); return; }
-
-  const targetWord = prompt.word;
-  const players = gameState.players || {};
-
-  const updates = {};
-  let winners = [];
-
-  Object.entries(players).forEach(([pid, p]) => {
-    const tank = p.tank || {};
-    if (tank[targetWord] !== undefined) {
-      updates[`players/${pid}/tank/${targetWord}/correct`] = true;
-      updates[`players/${pid}/score`] = (p.score || 0) + 10;
-      winners.push(p.name);
-    }
-  });
-
-  updates['prompt/active'] = false;
-  await update(ref(db, `rooms/${roomId}`), updates);
-
-  if (winners.length > 0) {
-    addLog(`✅ 정답: ${winners.join(', ')}님이 "${targetWord}" 맞춤! (+10점)`);
-    toast(`🎉 정답자: ${winners.join(', ')}!`, 3000);
-  } else {
-    addLog(`❌ "${targetWord}" 아무도 안 낚았네요!`);
-    toast('아무도 못 낚았어요!');
-  }
-};
-
-// ── 방장: 게임 종료 ──
-window.endGame = async function() {
-  await update(ref(db, `rooms/${roomId}`), { status: 'ended' });
-};
-
-// ── 결과 화면 ──
-function showResult() {
-  $('game').style.display = 'none';
-  $('result').style.display = 'block';
-
-  const players = gameState.players || {};
-  const sorted = Object.entries(players).sort((a,b) => (b[1].score||0) - (a[1].score||0));
-
-  $('winner-name').textContent = sorted[0] ? `🥇 ${sorted[0][1].name} (${sorted[0][1].score}점)` : '';
-
-  const list = $('result-list');
-  list.innerHTML = '';
-  sorted.forEach(([pid, p], i) => {
-    const row = document.createElement('div');
-    row.className = 'result-row' + (i===0?' first':'');
-    row.innerHTML = `<span>${['🥇','🥈','🥉','4️⃣'][i]||''} ${p.name}</span><span style="color:${p.color};font-weight:700">${p.score}점</span>`;
+function showResultScreen(){
+  showOnly('result');
+  const players=gameState.players||{};
+  const sorted=Object.entries(players).sort((a,b)=>(b[1].score||0)-(a[1].score||0));
+  $('winner-name').textContent=sorted[0]?`🥇 ${sorted[0][1].name} (${sorted[0][1].score||0}점)`:'모두 수고했어요!';
+  const list=$('result-list');list.innerHTML='';
+  sorted.forEach(([,p],i)=>{
+    const row=document.createElement('div');row.className='result-row'+(i===0?' first':'');
+    row.innerHTML=`<span>${['🥇','🥈','🥉'][i]||''} ${p.name}</span><span style="color:${p.color};font-weight:700">${p.score||0}점</span>`;
     list.appendChild(row);
   });
 }
 
-// ── 배경 버블 ──
-(function bubbles(){
-  const c = $('bubbles');
-  c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden';
-  for(let i=0;i<14;i++){
-    const b=document.createElement('div');
-    b.className='bubble';
-    const s=Math.random()*60+20;
-    b.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${Math.random()*18+12}s;animation-delay:${Math.random()*12}s`;
-    c.appendChild(b);
-  }
-})();
-
+// 버블
+(function(){const c=$('bubbles');c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden';for(let i=0;i<12;i++){const b=document.createElement('div');b.className='bubble';const s=Math.random()*55+18;b.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${Math.random()*18+12}s;animation-delay:${Math.random()*14}s`;c.appendChild(b);}})();
 </script>
 </body>
 </html>
