@@ -47,6 +47,16 @@ header h1 span{color:var(--gold);}
 .word-row .del-btn{background:rgba(255,82,82,.2);border:none;color:#ff5252;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem;flex-shrink:0;}
 .word-row .del-btn:hover{background:rgba(255,82,82,.4);}
 .answer-row{display:flex;align-items:center;gap:8px;margin-top:10px;background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.2);border-radius:10px;padding:10px 12px;flex-wrap:wrap;}
+.saved-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.saved-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 14px;cursor:pointer;transition:background .2s;}
+.saved-item:hover{background:rgba(255,255,255,.13);border-color:rgba(255,214,0,.4);}
+.saved-item .si-name{flex:1;font-size:.88rem;font-weight:700;}
+.saved-item .si-meta{font-size:.73rem;opacity:.5;}
+.saved-item .si-load{color:var(--gold);font-size:.78rem;font-weight:700;white-space:nowrap;}
+.saved-item .si-del{background:rgba(255,82,82,.2);border:none;color:#ff5252;border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:.85rem;flex-shrink:0;}
+.saved-item .si-del:hover{background:rgba(255,82,82,.4);}
+.save-row{display:flex;gap:8px;align-items:center;margin-top:12px;}
+.saved-empty{font-size:.8rem;opacity:.35;font-style:italic;padding:6px 0;}
 .ans-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(0,200,83,.2);border:1px solid rgba(0,200,83,.4);border-radius:20px;padding:4px 11px;font-size:.8rem;font-weight:700;color:#00e676;}
 .ans-del{cursor:pointer;opacity:.6;font-size:.85rem;line-height:1;}
 .ans-del:hover{opacity:1;color:#ff5252;}
@@ -165,6 +175,14 @@ header h1 span{color:var(--gold);}
 <!-- 설정 화면 -->
 <div id="setup">
   <div class="setup-section">
+    <h3>💾 저장된 게임 불러오기</h3>
+    <div id="saved-list-wrap"><div class="saved-empty">불러오는 중…</div></div>
+    <div class="save-row">
+      <input class="inp" id="save-name" placeholder="저장할 게임 이름 (예: 반려동물 보험 단원)" style="flex:1"/>
+      <button class="btn btn-primary" style="padding:9px 16px;font-size:.85rem;white-space:nowrap" onclick="saveGame()">💾 현재 설정 저장</button>
+    </div>
+  </div>
+  <div class="setup-section">
     <h3>⚙️ 기본 설정</h3>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <div style="flex:1;min-width:140px;">
@@ -265,7 +283,7 @@ header h1 span{color:var(--gold);}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, update }
+import { getDatabase, ref, set, get, onValue, update, remove, push }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -302,7 +320,79 @@ function showOnly(id){['lobby','setup','waiting-room','game','result'].forEach(s
 
 /* ── 설정 화면 ── */
 window.showLobby=()=>showOnly('lobby');
-window.goSetup=function(){showOnly('setup');renderSetupTabs();renderSetupRound(curSetupRound);};
+
+/* ── 저장된 게임 ── */
+async function loadSavedList(){
+  const wrap=$('saved-list-wrap');
+  if(!wrap)return;
+  try{
+    const snap=await get(ref(db,'savedGames'));
+    if(!snap.exists()||!snap.val()||Object.keys(snap.val()).length===0){
+      wrap.innerHTML='<div class="saved-empty">저장된 게임이 없어요. 라운드를 설정하고 저장해보세요!</div>';
+      return;
+    }
+    const games=snap.val();
+    wrap.innerHTML='<div class="saved-list">'+
+      Object.entries(games).map(([key,g])=>`
+        <div class="saved-item" onclick="loadGame('${key}')">
+          <div>
+            <div class="si-name">📂 ${g.name||'이름없음'}</div>
+            <div class="si-meta">${g.totalRounds||0}라운드 · ${g.savedAt||''}</div>
+          </div>
+          <span class="si-load">불러오기 →</span>
+          <button class="si-del" onclick="event.stopPropagation();deleteGame('${key}')">🗑</button>
+        </div>`).join('')+
+    '</div>';
+  }catch(e){wrap.innerHTML='<div class="saved-empty">불러오기 실패</div>';}
+}
+
+window.saveGame=async function(){
+  const name=$('save-name').value.trim();
+  if(!name){toast('저장할 게임 이름을 입력하세요!');return;}
+  const validRounds=roundConfigs.filter(cfg=>cfg.words.filter(w=>w.word.trim()).length>0);
+  if(validRounds.length===0){toast('저장할 라운드 설정이 없어요!');return;}
+  const now=new Date();
+  const savedAt=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
+  await push(ref(db,'savedGames'),{
+    name, savedAt,
+    totalRounds:validRounds.length,
+    rounds:validRounds.map(cfg=>({
+      words:cfg.words.filter(w=>w.word.trim()),
+      prompt:cfg.prompt||'',
+      answers:cfg.answers||[]
+    }))
+  });
+  $('save-name').value='';
+  toast(`✅ "${name}" 저장 완료!`);
+  loadSavedList();
+};
+
+window.loadGame=async function(key){
+  const snap=await get(ref(db,`savedGames/${key}`));
+  if(!snap.exists())return;
+  const g=snap.val();
+  const rounds=g.rounds||[];
+  roundConfigs=Array.from({length:5},(_,i)=>
+    i<rounds.length
+      ? {words:rounds[i].words||[],prompt:rounds[i].prompt||'',answers:rounds[i].answers||[]}
+      : {words:[],prompt:'',answers:[]}
+  );
+  inputMode=Array(5).fill(0);
+  curSetupRound=0;
+  renderSetupTabs();
+  renderSetupRound(0);
+  toast(`📂 "${g.name}" 불러오기 완료!`);
+};
+
+window.deleteGame=async function(key){
+  const snap=await get(ref(db,`savedGames/${key}`));
+  const name=snap.exists()?snap.val().name:'게임';
+  if(!confirm(`"${name}"을 삭제할까요?`))return;
+  await remove(ref(db,`savedGames/${key}`));
+  toast('🗑 삭제됐습니다');
+  loadSavedList();
+};
+window.goSetup=function(){showOnly('setup');renderSetupTabs();renderSetupRound(curSetupRound);loadSavedList();};
 
 function renderSetupTabs(){
   const tabs=$('round-tabs');tabs.innerHTML='';
