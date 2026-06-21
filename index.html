@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎣 단어낚시 게임</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;900&display=swap');
+
+    :root {
+      --ocean-deep: #0a2342;
+      --ocean-mid:  #0d3b6e;
+      --ocean-light:#1565c0;
+      --wave:       #1e88e5;
+      --foam:       #e3f2fd;
+      --sand:       #fff8e1;
+      --coral:      #ff5252;
+      --gold:       #ffd600;
+      --green:      #00c853;
+      --text-light: #e3f2fd;
+      --text-dark:  #0a2342;
+
+      --p1: #ff7043; /* 플레이어 색상 */
+      --p2: #ab47bc;
+      --p3: #26a69a;
+      --p4: #42a5f5;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: linear-gradient(180deg, var(--ocean-deep) 0%, var(--ocean-mid) 60%, #1a237e 100%);
+      min-height: 100vh;
+      color: var(--text-light);
+      overflow-x: hidden;
+    }
+
+    /* ── 헤더 ── */
+    header {
+      text-align: center;
+      padding: 18px 20px 10px;
+      position: relative;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -1px;
+      text-shadow: 0 2px 12px rgba(0,0,0,.5);
+    }
+    header h1 span { color: var(--gold); }
+    #room-info {
+      font-size: .8rem;
+      opacity: .7;
+      margin-top: 4px;
+    }
+
+    /* ── 진입 화면 ── */
+    #lobby {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      min-height: 80vh;
+      padding: 20px;
+    }
+    #lobby h2 { font-size: 1.4rem; font-weight: 700; text-align: center; }
+    .lobby-card {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .lobby-card label { font-size: .85rem; font-weight: 600; opacity: .8; }
+    .lobby-card input, .lobby-card select {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+      transition: border .2s;
+    }
+    .lobby-card input::placeholder { color: rgba(255,255,255,.4); }
+    .lobby-card input:focus { border-color: var(--gold); }
+
+    /* ── 버튼 ── */
+    .btn {
+      padding: 11px 22px;
+      border-radius: 12px;
+      border: none;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s, opacity .15s;
+    }
+    .btn:active { transform: scale(.96); }
+    .btn-primary {
+      background: linear-gradient(135deg, #ffd600, #ff8f00);
+      color: #0a2342;
+      box-shadow: 0 4px 16px rgba(255,214,0,.3);
+    }
+    .btn-primary:hover { box-shadow: 0 6px 20px rgba(255,214,0,.5); }
+    .btn-secondary {
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--gold);
+      border: 1px solid var(--gold);
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    /* ── 게임 레이아웃 ── */
+    #game { display: none; padding: 0 10px 20px; }
+
+    /* 스코어보드 */
+    #scoreboard {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin: 8px auto 12px;
+      flex-wrap: wrap;
+      max-width: 600px;
+    }
+    .score-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: .82rem;
+      font-weight: 700;
+      background: rgba(255,255,255,.1);
+      border: 2px solid transparent;
+      transition: border .2s;
+    }
+    .score-chip.me { border-color: var(--gold); }
+    .score-chip .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    /* 방장 컨트롤 */
+    #host-panel {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin: 0 auto 14px;
+      max-width: 600px;
+      display: none;
+    }
+    #host-panel h3 { font-size: .9rem; font-weight: 700; margin-bottom: 10px; opacity: .8; }
+    #host-panel .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    #host-panel input {
+      flex: 1; min-width: 120px;
+      padding: 9px 13px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      font-size: .95rem;
+      font-family: inherit;
+      outline: none;
+    }
+    #host-panel input:focus { border-color: var(--gold); }
+    #host-panel input::placeholder { color: rgba(255,255,255,.4); }
+    #host-panel select {
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(20,40,80,.8);
+      color: #fff;
+      font-family: inherit;
+      font-size: .9rem;
+      outline: none;
+    }
+
+    /* 현재 라운드 표시 */
+    #round-display {
+      text-align: center;
+      margin: 0 auto 14px;
+      max-width: 600px;
+    }
+    #round-display .prompt-box {
+      background: linear-gradient(135deg, rgba(255,214,0,.15), rgba(255,143,0,.1));
+      border: 1px solid rgba(255,214,0,.4);
+      border-radius: 14px;
+      padding: 14px 20px;
+      display: inline-block;
+      min-width: 200px;
+    }
+    #round-display .prompt-label { font-size: .75rem; opacity: .7; margin-bottom: 4px; }
+    #round-display .prompt-text { font-size: 1.5rem; font-weight: 900; color: var(--gold); }
+    #round-display .prompt-count { font-size: .8rem; opacity: .7; margin-top: 2px; }
+
+    /* ── 중앙 낚시터 ── */
+    #pond {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto 16px;
+      min-height: 260px;
+      background: radial-gradient(ellipse at 50% 60%, rgba(21,101,192,.4) 0%, rgba(10,35,66,.6) 100%);
+      border-radius: 20px;
+      border: 1px solid rgba(30,136,229,.3);
+      overflow: hidden;
+      padding: 14px;
+    }
+    #pond::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(100,180,255,.5), transparent);
+      animation: shimmer 3s infinite;
+    }
+    @keyframes shimmer { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+    #pond-label {
+      font-size: .75rem;
+      font-weight: 700;
+      opacity: .5;
+      text-align: center;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    #fish-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+      padding: 6px 0;
+    }
+
+    /* 물고기 단어 카드 */
+    .fish-word {
+      position: relative;
+      cursor: pointer;
+      transition: transform .2s;
+      user-select: none;
+    }
+    .fish-word:hover { transform: scale(1.08) rotate(-2deg); }
+    .fish-word.taken { opacity: .35; cursor: default; pointer-events: none; }
+    .fish-word.taken:hover { transform: none; }
+    .fish-word.selecting { animation: wiggle .3s ease; }
+    @keyframes wiggle {
+      0%,100%{transform:rotate(0)} 25%{transform:rotate(-6deg)} 75%{transform:rotate(6deg)}
+    }
+
+    .fish-svg { display: block; }
+    .fish-text {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: .78rem;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,.6);
+      white-space: nowrap;
+      pointer-events: none;
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+    }
+    .fish-count-badge {
+      position: absolute;
+      top: -4px; right: -4px;
+      background: var(--gold);
+      color: #0a2342;
+      font-size: .65rem;
+      font-weight: 900;
+      border-radius: 50%;
+      width: 18px; height: 18px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fish-taken-by {
+      position: absolute;
+      bottom: -2px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 2px;
+    }
+    .taken-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,.3);
+    }
+
+    /* ── 내 물고기통 4개 ── */
+    #tanks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .tank {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 14px;
+      padding: 10px 10px 12px;
+      min-height: 110px;
+      transition: border .2s;
+      position: relative;
+    }
+    .tank.mine { border-color: rgba(255,214,0,.35); }
+    .tank-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .tank-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .tank-name { font-size: .78rem; font-weight: 700; opacity: .85; }
+    .tank-score { margin-left: auto; font-size: .75rem; color: var(--gold); font-weight: 700; }
+    .tank-fish {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .tank-fish-item {
+      background: rgba(255,255,255,.1);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: .72rem;
+      font-weight: 600;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .tank-fish-item .tick { color: var(--green); font-size: .8rem; }
+    .tank-fish-item .cross { color: var(--coral); font-size: .8rem; }
+    .tank-empty { font-size: .72rem; opacity: .35; font-style: italic; }
+
+    /* 시스템 로그 */
+    #log {
+      max-width: 600px;
+      margin: 14px auto 0;
+      background: rgba(0,0,0,.2);
+      border-radius: 12px;
+      padding: 10px 14px;
+      max-height: 100px;
+      overflow-y: auto;
+      font-size: .75rem;
+      opacity: .8;
+    }
+    .log-line { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+    .log-line:last-child { border: none; }
+
+    /* ── 게임 끝 ── */
+    #result {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    #result h2 { font-size: 2rem; font-weight: 900; margin-bottom: 6px; }
+    #result .winner-name { font-size: 1.2rem; color: var(--gold); }
+    #result-list { margin: 20px auto; max-width: 300px; }
+    .result-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      background: rgba(255,255,255,.07);
+    }
+    .result-row.first { background: rgba(255,214,0,.15); border: 1px solid var(--gold); }
+
+    /* 토스트 */
+    #toast {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(20,40,80,.95);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 12px;
+      padding: 12px 24px;
+      font-size: .9rem;
+      font-weight: 600;
+      transition: transform .3s ease;
+      z-index: 999;
+      text-align: center;
+      max-width: 320px;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── 버블 장식 ── */
+    .bubble {
+      position: fixed;
+      border-radius: 50%;
+      background: rgba(100,180,255,.06);
+      pointer-events: none;
+      animation: rise linear infinite;
+    }
+    @keyframes rise {
+      from { transform: translateY(100vh) scale(0); opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: .6; }
+      to   { transform: translateY(-20vh) scale(1); opacity: 0; }
+    }
+
+    /* 반응형 */
+    @media (max-width: 420px) {
+      header h1 { font-size: 1.5rem; }
+      #tanks { grid-template-columns: 1fr 1fr; gap: 7px; }
+      .fish-text { font-size: .7rem; max-width: 65px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 배경 버블 -->
+<div id="bubbles"></div>
+
+<header>
+  <h1>🎣 단어<span>낚시</span></h1>
+  <div id="room-info">반려동물 보험 에디션</div>
+</header>
+
+<!-- ── 로비 ── -->
+<div id="lobby">
+  <div class="lobby-card">
+    <h2>🐠 게임 입장</h2>
+
+    <label>닉네임</label>
+    <input id="nickname" type="text" placeholder="예: 강아지사랑" maxlength="8" />
+
+    <label>방 코드</label>
+    <input id="room-code" type="text" placeholder="예: FISH01" maxlength="8" style="text-transform:uppercase" />
+
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1" onclick="joinRoom()">입장하기</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="createRoom()">방 만들기</button>
+    </div>
+    <div id="lobby-msg" style="font-size:.8rem;color:#ff8a65;text-align:center;min-height:18px;"></div>
+  </div>
+</div>
+
+<!-- ── 게임 화면 ── -->
+<div id="game">
+
+  <!-- 스코어보드 -->
+  <div id="scoreboard"></div>
+
+  <!-- 방장 입력 패널 -->
+  <div id="host-panel">
+    <h3>🎯 방장 컨트롤</h3>
+    <div class="row">
+      <input id="prompt-word" placeholder="제시어 (예: 보험)" />
+      <select id="prompt-count">
+        <option value="1">×1 희귀</option>
+        <option value="2">×2</option>
+        <option value="3" selected>×3</option>
+        <option value="4">×4 다다익선</option>
+      </select>
+      <button class="btn btn-primary" onclick="issuePrompt()">출제!</button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" style="font-size:.8rem" onclick="revealAnswers()">정답 공개</button>
+      <button class="btn btn-secondary" style="font-size:.8rem" onclick="endGame()">게임 종료</button>
+    </div>
+  </div>
+
+  <!-- 현재 제시어 -->
+  <div id="round-display">
+    <div class="prompt-box" id="prompt-box" style="display:none">
+      <div class="prompt-label">🎯 지금 찾아야 할 단어</div>
+      <div class="prompt-text" id="prompt-text"></div>
+      <div class="prompt-count" id="prompt-count-text"></div>
+    </div>
+    <div id="waiting-text" style="opacity:.5;font-size:.9rem;margin-top:10px;">방장의 제시어를 기다리는 중…</div>
+  </div>
+
+  <!-- 중앙 낚시터 -->
+  <div id="pond">
+    <div id="pond-label">🌊 낚시터 — 단어를 클릭해서 내 통에 넣기</div>
+    <div id="fish-grid"></div>
+  </div>
+
+  <!-- 내 물고기통 -->
+  <div id="tanks"></div>
+
+  <!-- 로그 -->
+  <div id="log"><div class="log-line" style="opacity:.4">게임 로그가 여기에 표시됩니다.</div></div>
+</div>
+
+<!-- 결과 화면 -->
+<div id="result">
+  <div style="font-size:3rem">🏆</div>
+  <h2>게임 종료!</h2>
+  <div class="winner-name" id="winner-name"></div>
+  <div id="result-list"></div>
+  <button class="btn btn-primary" style="margin-top:10px" onclick="location.reload()">다시 하기</button>
+</div>
+
+<!-- 토스트 -->
+<div id="toast"></div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, push, onValue, update, remove }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+/* ════════════════════════════════════════════════════
+   🔧 여기에 본인의 Firebase 설정값을 넣으세요!
+   Firebase Console → 프로젝트 설정 → 웹 앱 → firebaseConfig
+   ════════════════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey:            "AIzaSyBFRDIlJ4UC0wqhp1uqVExtSYQJiRlt5iA",
+  authDomain:        "fishing-9f25f.firebaseapp.com",
+  databaseURL:       "https://fishing-9f25f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "fishing-9f25f",
+  storageBucket:     "fishing-9f25f.firebasestorage.app",
+  messagingSenderId: "603443829496",
+  appId:             "1:603443829496:web:3dd987effb6f8302d7f90d"
+};
+/* ════════════════════════════════════════════════════ */
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+// ── 기사 단어 목록 ──
+const ARTICLE_WORDS = [
+  "반려동물","가족","치료","병원","수술","치료비","슬개골","탈구",
+  "심장병","부담","보호자","보험","가입","보장","MRI","치과",
+  "입원비","전문가","건강","병원비","걱정","강아지","수백만원","무릎",
+  "질환","매달","납부","혜택","보험료","펫보험"
+];
+
+// 플레이어 색상
+const PLAYER_COLORS = ["#ff7043","#ab47bc","#26a69a","#42a5f5"];
+
+// 물고기 SVG 색상 팔레트 (물고기별로 다양)
+const FISH_COLORS = [
+  ["#0d47a1","#1565c0"],["#1b5e20","#2e7d32"],["#4a148c","#6a1b9a"],
+  ["#bf360c","#d84315"],["#006064","#00838f"],["#827717","#9e9d24"],
+  ["#880e4f","#ad1457"],["#01579b","#0277bd"],["#33691e","#558b2f"],
+  ["#3e2723","#5d4037"]
+];
+
+// ── 상태 ──
+let roomId, playerId, playerName, isHost;
+let gameState = {};
+
+// ── 유틸 ──
+const $ = id => document.getElementById(id);
+function toast(msg, dur=2500) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+function addLog(msg) {
+  const log = $('log');
+  const d = document.createElement('div');
+  d.className = 'log-line';
+  d.textContent = `[${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}] ${msg}`;
+  log.prepend(d);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+// ── 물고기 SVG 생성 ──
+function makeFishSVG(word, colorPair, size=100) {
+  const [c1,c2] = colorPair;
+  const w = size, h = size * 0.55;
+  return `<svg class="fish-svg" width="${w}" height="${h}" viewBox="0 0 100 55" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="fg${word}" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="${c1}"/>
+        <stop offset="100%" stop-color="${c2}"/>
+      </linearGradient>
+    </defs>
+    <!-- 꼬리 -->
+    <polygon points="8,27 22,14 22,40" fill="${c1}" opacity=".85"/>
+    <!-- 몸통 -->
+    <ellipse cx="58" cy="27" rx="36" ry="20" fill="url(#fg${word})"/>
+    <!-- 지느러미 위 -->
+    <path d="M45,10 Q55,3 65,10" stroke="${c2}" stroke-width="2" fill="none"/>
+    <!-- 눈 -->
+    <circle cx="88" cy="23" r="4" fill="white"/>
+    <circle cx="89" cy="23" r="2" fill="#1a237e"/>
+    <!-- 비늘 느낌 -->
+    <path d="M50,18 Q55,27 50,36" stroke="rgba(255,255,255,.15)" stroke-width="1.5" fill="none"/>
+    <path d="M62,16 Q67,27 62,38" stroke="rgba(255,255,255,.12)" stroke-width="1.5" fill="none"/>
+  </svg>`;
+}
+
+// ── 방 만들기 ──
+window.createRoom = async function() {
+  const nn = $('nickname').value.trim();
+  const rc = $('room-code').value.trim().toUpperCase() || 'FISH' + Math.random().toString(36).slice(2,6).toUpperCase();
+  if (!nn) { $('lobby-msg').textContent='닉네임을 입력하세요'; return; }
+
+  roomId = rc;
+  playerId = 'p_' + Date.now();
+  playerName = nn;
+  isHost = true;
+
+  // 단어 풀 생성 (개수 1~4 랜덤)
+  const shuffled = [...ARTICLE_WORDS].sort(() => Math.random()-.5).slice(0, 16);
+  const wordPool = {};
+  shuffled.forEach((w, i) => {
+    wordPool[w] = { count: [1,1,2,2,3,3,4][Math.floor(Math.random()*7)], takenBy: {} };
+  });
+
+  await set(ref(db, `rooms/${roomId}`), {
+    host: playerId,
+    status: 'waiting',
+    wordPool,
+    prompt: null,
+    players: {
+      [playerId]: { name: nn, score: 0, color: PLAYER_COLORS[0], tank: {} }
+    }
+  });
+
+  $('room-code').value = rc;
+  enterGame();
+};
+
+// ── 방 입장 ──
+window.joinRoom = async function() {
+  const nn = $('nickname').value.trim();
+  const rc = $('room-code').value.trim().toUpperCase();
+  if (!nn) { $('lobby-msg').textContent='닉네임을 입력하세요'; return; }
+  if (!rc) { $('lobby-msg').textContent='방 코드를 입력하세요'; return; }
+
+  roomId = rc;
+  const snap = await get(ref(db, `rooms/${roomId}`));
+  if (!snap.exists()) { $('lobby-msg').textContent='존재하지 않는 방입니다'; return; }
+
+  const data = snap.val();
+  const players = data.players || {};
+  const count = Object.keys(players).length;
+  if (count >= 4) { $('lobby-msg').textContent='방이 꽉 찼습니다 (최대 4명)'; return; }
+
+  playerId = 'p_' + Date.now();
+  playerName = nn;
+  isHost = data.host === playerId;
+
+  const color = PLAYER_COLORS[count];
+  await set(ref(db, `rooms/${roomId}/players/${playerId}`), {
+    name: nn, score: 0, color, tank: {}
+  });
+
+  enterGame();
+};
+
+// ── 게임 화면 진입 ──
+function enterGame() {
+  $('lobby').style.display = 'none';
+  $('game').style.display = 'block';
+  $('room-info').textContent = `방 코드: ${roomId}  |  닉네임: ${playerName}`;
+
+  // 리스너
+  onValue(ref(db, `rooms/${roomId}`), snap => {
+    if (!snap.exists()) return;
+    gameState = snap.val();
+
+    // 방장 여부
+    isHost = gameState.host === playerId;
+    $('host-panel').style.display = isHost ? 'block' : 'none';
+
+    renderScoreboard();
+    renderPond();
+    renderTanks();
+    renderPrompt();
+
+    if (gameState.status === 'ended') showResult();
+  });
+}
+
+// ── 스코어보드 ──
+function renderScoreboard() {
+  const players = gameState.players || {};
+  const board = $('scoreboard');
+  board.innerHTML = '';
+  Object.entries(players).forEach(([pid, p]) => {
+    const chip = document.createElement('div');
+    chip.className = 'score-chip' + (pid === playerId ? ' me' : '');
+    chip.innerHTML = `<span class="dot" style="background:${p.color}"></span><span>${p.name}</span><span style="margin-left:4px;color:${p.color}">${p.score}점</span>`;
+    board.appendChild(chip);
+  });
+}
+
+// ── 낚시터 렌더 ──
+function renderPond() {
+  const pool = gameState.wordPool || {};
+  const grid = $('fish-grid');
+  grid.innerHTML = '';
+
+  Object.entries(pool).forEach(([word, data], i) => {
+    const takenBy = data.takenBy || {};
+    const takenCount = Object.keys(takenBy).length;
+    const myTaken = !!takenBy[playerId];
+    const isFull = takenCount >= data.count;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'fish-word' + (isFull ? ' taken' : '');
+    wrapper.dataset.word = word;
+
+    const colorPair = FISH_COLORS[i % FISH_COLORS.length];
+    const size = word.length <= 3 ? 88 : word.length <= 5 ? 100 : 112;
+
+    wrapper.innerHTML = makeFishSVG(word + i, colorPair, size);
+
+    // 단어 텍스트
+    const label = document.createElement('div');
+    label.className = 'fish-text';
+    label.textContent = word;
+    wrapper.appendChild(label);
+
+    // 개수 뱃지
+    const badge = document.createElement('div');
+    badge.className = 'fish-count-badge';
+    badge.textContent = data.count;
+    wrapper.appendChild(badge);
+
+    // 누가 이미 잡았는지 표시
+    if (takenCount > 0) {
+      const dots = document.createElement('div');
+      dots.className = 'fish-taken-by';
+      const players = gameState.players || {};
+      Object.keys(takenBy).forEach(pid => {
+        const dot = document.createElement('div');
+        dot.className = 'taken-dot';
+        dot.style.background = players[pid]?.color || '#888';
+        dots.appendChild(dot);
+      });
+      wrapper.appendChild(dots);
+    }
+
+    if (!isFull && !myTaken) {
+      wrapper.onclick = () => catchFish(word);
+    }
+
+    // 이미 내가 잡은 것 표시
+    if (myTaken) {
+      wrapper.style.filter = 'brightness(.6)';
+      wrapper.style.cursor = 'default';
+    }
+
+    grid.appendChild(wrapper);
+  });
+}
+
+// ── 물고기 잡기 ──
+async function catchFish(word) {
+  const pool = gameState.wordPool || {};
+  const data = pool[word];
+  if (!data) return;
+
+  const takenBy = data.takenBy || {};
+  if (takenBy[playerId]) { toast('이미 내 통에 넣었어요!'); return; }
+  if (Object.keys(takenBy).length >= data.count) { toast('이미 꽉 찼어요!'); return; }
+
+  // 낚시터에서 잡기
+  await update(ref(db, `rooms/${roomId}/wordPool/${word}/takenBy`), { [playerId]: true });
+  // 내 통에 추가 (정답 여부는 나중에 판별)
+  await update(ref(db, `rooms/${roomId}/players/${playerId}/tank`), { [word]: { round: gameState.prompt?.word || '?', correct: null }});
+
+  addLog(`${playerName}님이 "${word}"를 낚았습니다!`);
+  toast(`🎣 "${word}" 낚음!`);
+}
+
+// ── 탱크 렌더 ──
+function renderTanks() {
+  const players = gameState.players || {};
+  const container = $('tanks');
+  container.innerHTML = '';
+
+  // 나 먼저
+  const sortedIds = Object.keys(players).sort(a => a === playerId ? -1 : 1);
+
+  sortedIds.forEach(pid => {
+    const p = players[pid];
+    const tank = document.createElement('div');
+    tank.className = 'tank' + (pid === playerId ? ' mine' : '');
+
+    const header = document.createElement('div');
+    header.className = 'tank-header';
+    header.innerHTML = `
+      <div class="tank-dot" style="background:${p.color}"></div>
+      <div class="tank-name">${pid === playerId ? '🪣 내 통' : p.name}</div>
+      <div class="tank-score">${p.score}점</div>
+    `;
+    tank.appendChild(header);
+
+    const fishList = document.createElement('div');
+    fishList.className = 'tank-fish';
+
+    const tankData = p.tank || {};
+    const entries = Object.entries(tankData);
+
+    if (entries.length === 0) {
+      fishList.innerHTML = `<div class="tank-empty">아직 낚은 물고기가 없어요</div>`;
+    } else {
+      entries.forEach(([word, info]) => {
+        const item = document.createElement('div');
+        item.className = 'tank-fish-item';
+        let icon = '';
+        if (info.correct === true) icon = '<span class="tick">✓</span>';
+        else if (info.correct === false) icon = '<span class="cross">✗</span>';
+        item.innerHTML = `${icon}🐟 ${word}`;
+        fishList.appendChild(item);
+      });
+    }
+
+    tank.appendChild(fishList);
+    container.appendChild(tank);
+  });
+}
+
+// ── 제시어 렌더 ──
+function renderPrompt() {
+  const prompt = gameState.prompt;
+  const box = $('prompt-box');
+  const waiting = $('waiting-text');
+
+  if (prompt && prompt.active) {
+    box.style.display = 'inline-block';
+    waiting.style.display = 'none';
+    $('prompt-text').textContent = `"${prompt.word}" × ${prompt.count}`;
+    $('prompt-count-text').textContent = `최대 ${prompt.count}명이 정답을 얻을 수 있어요`;
+  } else {
+    box.style.display = 'none';
+    waiting.style.display = 'block';
+  }
+}
+
+// ── 방장: 제시어 출제 ──
+window.issuePrompt = async function() {
+  const word = $('prompt-word').value.trim();
+  const count = parseInt($('prompt-count').value);
+  if (!word) { toast('제시어를 입력하세요!'); return; }
+
+  // 해당 단어가 낚시터에 있는지 확인
+  const pool = gameState.wordPool || {};
+  if (!pool[word]) { toast('낚시터에 없는 단어예요. 다시 확인하세요.'); return; }
+
+  await update(ref(db, `rooms/${roomId}`), {
+    prompt: { word, count, active: true, issuedAt: Date.now() }
+  });
+  // 해당 단어의 count를 재설정
+  await update(ref(db, `rooms/${roomId}/wordPool/${word}`), { count });
+
+  addLog(`방장이 제시어 "${word}" (×${count}) 출제!`);
+  $('prompt-word').value = '';
+};
+
+// ── 방장: 정답 공개 ──
+window.revealAnswers = async function() {
+  const prompt = gameState.prompt;
+  if (!prompt || !prompt.active) { toast('먼저 제시어를 출제하세요'); return; }
+
+  const targetWord = prompt.word;
+  const players = gameState.players || {};
+
+  const updates = {};
+  let winners = [];
+
+  Object.entries(players).forEach(([pid, p]) => {
+    const tank = p.tank || {};
+    if (tank[targetWord] !== undefined) {
+      updates[`players/${pid}/tank/${targetWord}/correct`] = true;
+      updates[`players/${pid}/score`] = (p.score || 0) + 10;
+      winners.push(p.name);
+    }
+  });
+
+  updates['prompt/active'] = false;
+  await update(ref(db, `rooms/${roomId}`), updates);
+
+  if (winners.length > 0) {
+    addLog(`✅ 정답: ${winners.join(', ')}님이 "${targetWord}" 맞춤! (+10점)`);
+    toast(`🎉 정답자: ${winners.join(', ')}!`, 3000);
+  } else {
+    addLog(`❌ "${targetWord}" 아무도 안 낚았네요!`);
+    toast('아무도 못 낚았어요!');
+  }
+};
+
+// ── 방장: 게임 종료 ──
+window.endGame = async function() {
+  await update(ref(db, `rooms/${roomId}`), { status: 'ended' });
+};
+
+// ── 결과 화면 ──
+function showResult() {
+  $('game').style.display = 'none';
+  $('result').style.display = 'block';
+
+  const players = gameState.players || {};
+  const sorted = Object.entries(players).sort((a,b) => (b[1].score||0) - (a[1].score||0));
+
+  $('winner-name').textContent = sorted[0] ? `🥇 ${sorted[0][1].name} (${sorted[0][1].score}점)` : '';
+
+  const list = $('result-list');
+  list.innerHTML = '';
+  sorted.forEach(([pid, p], i) => {
+    const row = document.createElement('div');
+    row.className = 'result-row' + (i===0?' first':'');
+    row.innerHTML = `<span>${['🥇','🥈','🥉','4️⃣'][i]||''} ${p.name}</span><span style="color:${p.color};font-weight:700">${p.score}점</span>`;
+    list.appendChild(row);
+  });
+}
+
+// ── 배경 버블 ──
+(function bubbles(){
+  const c = $('bubbles');
+  c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden';
+  for(let i=0;i<14;i++){
+    const b=document.createElement('div');
+    b.className='bubble';
+    const s=Math.random()*60+20;
+    b.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${Math.random()*18+12}s;animation-delay:${Math.random()*12}s`;
+    c.appendChild(b);
+  }
+})();
+
+</script>
+</body>
+</html>
