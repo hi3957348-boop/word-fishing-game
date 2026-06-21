@@ -47,6 +47,11 @@ header h1 span{color:var(--gold);}
 .word-row .del-btn{background:rgba(255,82,82,.2);border:none;color:#ff5252;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:1rem;flex-shrink:0;}
 .word-row .del-btn:hover{background:rgba(255,82,82,.4);}
 .answer-row{display:flex;align-items:center;gap:8px;margin-top:10px;background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.2);border-radius:10px;padding:10px 12px;flex-wrap:wrap;}
+.ans-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(0,200,83,.2);border:1px solid rgba(0,200,83,.4);border-radius:20px;padding:4px 11px;font-size:.8rem;font-weight:700;color:#00e676;}
+.ans-del{cursor:pointer;opacity:.6;font-size:.85rem;line-height:1;}
+.ans-del:hover{opacity:1;color:#ff5252;}
+.fish-word.wrong-flash{animation:wrongFlash .4s ease;}
+@keyframes wrongFlash{0%,100%{filter:brightness(1)}25%{filter:brightness(2) hue-rotate(300deg)}75%{filter:brightness(.5)}}
 .paste-area{width:100%;min-height:90px;padding:10px 13px;border-radius:10px;border:1px dashed rgba(255,255,255,.25);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-size:.88rem;resize:vertical;outline:none;transition:border .2s;line-height:1.7;}
 .paste-area:focus{border-color:var(--gold);background:rgba(255,255,255,.08);}
 .paste-area::placeholder{color:rgba(255,255,255,.3);}
@@ -288,7 +293,7 @@ let roomId,playerId,playerName,isHost;
 let autoRevealTimer=null,timerInterval=null,timerStartedRound=-1;
 let gameState={};
 let curSetupRound=0;
-let roundConfigs=Array.from({length:5},()=>({words:[],prompt:'',answer:''}));
+let roundConfigs=Array.from({length:5},()=>({words:[],prompt:'',answers:[]}));
 
 const $=id=>document.getElementById(id);
 function toast(msg,dur=2500){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
@@ -356,11 +361,25 @@ function renderSetupRound(ri){
   }
 
   // ── 제시어/정답 (공통) ──
-  const ar=document.createElement('div');ar.className='answer-row';
-  ar.innerHTML=`<label>🎯 제시어</label>
-    <input class="inp" placeholder="힌트 문구 (예: 비용 관련 단어?)" value="${cfg.prompt||''}" style="flex:1;min-width:120px" oninput="updateMeta(${ri},'prompt',this.value)"/>
-    <label style="margin-left:6px">✅ 정답</label>
-    <input class="inp" placeholder="정답 단어" value="${cfg.answer||''}" style="flex:1;min-width:80px" oninput="updateMeta(${ri},'answer',this.value)"/>`;
+  const ar=document.createElement('div');ar.className='answer-row';ar.style.flexDirection='column';ar.style.alignItems='stretch';ar.style.gap='10px';
+
+  // 제시어
+  const promptRow=document.createElement('div');promptRow.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+  promptRow.innerHTML=`<label style="font-size:.8rem;opacity:.7;white-space:nowrap">🎯 제시어</label>
+    <input class="inp" placeholder="힌트 문구 (예: 비용 관련 단어?)" value="${cfg.prompt||''}" style="flex:1;min-width:120px" oninput="updateMeta(${ri},'prompt',this.value)"/>`;
+  ar.appendChild(promptRow);
+
+  // 정답 태그들
+  const answerSection=document.createElement('div');
+  const answers=cfg.answers||[];
+  const answerTagsHTML=answers.map((a,ai)=>`<span class="ans-tag">${a}<span class="ans-del" onclick="removeAnswer(${ri},${ai})">✕</span></span>`).join('');
+  answerSection.innerHTML=`<div style="font-size:.8rem;opacity:.7;margin-bottom:6px;">✅ 정답 단어 <span style="opacity:.6">(여러 개 가능 — 낚을 수 있는 단어)</span></div>
+    <div id="ans-tags-${ri}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${answerTagsHTML||'<span style="font-size:.75rem;opacity:.35;font-style:italic">정답 단어를 추가하세요</span>'}</div>
+    <div style="display:flex;gap:7px;">
+      <input class="inp" id="ans-inp-${ri}" placeholder="정답 단어 입력 후 Enter" style="flex:1" onkeydown="if(event.key==='Enter')addAnswer(${ri})"/>
+      <button class="btn btn-primary" style="padding:8px 14px;font-size:.82rem" onclick="addAnswer(${ri})">추가</button>
+    </div>`;
+  ar.appendChild(answerSection);
   c.appendChild(ar);
   updatePreview(ri);
 }
@@ -385,6 +404,17 @@ window.updateWord=function(ri,idx,key,val){
 };
 window.removeWord=function(ri,idx){roundConfigs[ri].words.splice(idx,1);renderSetupRound(ri);};
 window.updateMeta=function(ri,key,val){roundConfigs[ri][key]=val;};
+window.addAnswer=function(ri){
+  const inp=$('ans-inp-'+ri);if(!inp)return;
+  const w=inp.value.trim();if(!w)return;
+  if(!roundConfigs[ri].answers)roundConfigs[ri].answers=[];
+  if(roundConfigs[ri].answers.includes(w)){toast('이미 추가된 정답이에요!');inp.value='';return;}
+  roundConfigs[ri].answers.push(w);
+  inp.value='';renderSetupRound(ri);
+};
+window.removeAnswer=function(ri,ai){
+  roundConfigs[ri].answers.splice(ai,1);renderSetupRound(ri);
+};
 
 function updatePreview(ri){
   const pond=$('preview-pond');pond.innerHTML='';
@@ -409,7 +439,7 @@ window.createRoom=async function(){
   validRounds.forEach((cfg,ri)=>{
     const wp={};
     cfg.words.filter(w=>w.word.trim()).forEach(e=>{wp[e.word.trim()]={count:parseInt(e.count)||2,takenBy:{}};});
-    rounds[ri]={wordPool:wp,prompt:cfg.prompt||`${ri+1}라운드 제시어`,answer:cfg.answer||'',revealed:false};
+    rounds[ri]={wordPool:wp,prompt:cfg.prompt||`${ri+1}라운드 제시어`,answers:cfg.answers||[],revealed:false};
   });
   await set(ref(db,`rooms/${roomId}`),{
     host:playerId,hostName:nn,status:'waiting',
@@ -517,7 +547,7 @@ function updateHostPanel(){
   const rd=getCurRound(),ri=gameState.currentRound||0,total=gameState.totalRounds||1;
   $('hg-round-label').textContent=`${ri+1} / ${total} 라운드`;
   $('hg-prompt').textContent=rd.prompt||'(없음)';
-  $('hg-answer').textContent=rd.answer||'(없음)';
+  const ans=(rd.answers||[]).filter(a=>a.trim());$('hg-answer').textContent=ans.length?ans.join(', '):'(없음)';
   $('next-round-btn').disabled=!rd.revealed;
   $('next-round-btn').textContent=ri+1>=total?'🏁 결과 보기':'다음 라운드 →';
 }
@@ -539,7 +569,9 @@ function renderPond(){
       Object.keys(takenBy).forEach(pid=>{const dot=document.createElement('div');dot.className='taken-dot';dot.style.background=players[pid]?.color||'#888';dots.appendChild(dot);});
       wrapper.appendChild(dots);
     }
-    if(!isHost&&!isFull&&!myTaken&&!rd.revealed)wrapper.onclick=()=>catchFish(word);
+    if(!isHost&&!isFull&&!myTaken&&!rd.revealed){
+      wrapper.onclick=()=>catchFish(word,wrapper);
+    }
     grid.appendChild(wrapper);
   });
 }
@@ -560,12 +592,32 @@ function makeFishSVG(word,idx,cp,size){
   </svg>`;
 }
 
-async function catchFish(word){
+async function catchFish(word,el){
   const ri=gameState.currentRound||0,rd=getCurRound(),data=(rd.wordPool||{})[word];
   if(!data)return;
   const takenBy=data.takenBy||{};
   if(takenBy[playerId]){toast('이미 내 통에 있어요!');return;}
   if(Object.keys(takenBy).length>=(data.count||2)){toast('이미 꽉 찼어요!');return;}
+
+  // 정답 목록 체크
+  const answers=rd.answers||[];
+  const isCorrect=answers.length===0||answers.includes(word); // 정답 미설정시 모두 허용
+  if(!isCorrect){
+    // 오답 — 2초 잠금
+    if(el){
+      el.style.pointerEvents='none';
+      el.classList.add('wrong-flash');
+      el.style.filter='brightness(.4) saturate(.3)';
+      setTimeout(()=>{
+        el.style.pointerEvents='';
+        el.classList.remove('wrong-flash');
+        el.style.filter='';
+      },2000);
+    }
+    toast('❌ 낚을 수 없어요! 2초 후 재시도 가능');
+    return;
+  }
+
   await update(ref(db,`rooms/${roomId}/rounds/${ri}/wordPool/${word}/takenBy`),{[playerId]:true});
   await update(ref(db,`rooms/${roomId}/players/${playerId}/tank`),{[word]:{round:ri,correct:null}});
   addLog(`${playerName}님이 "${word}"를 낚았습니다!`);toast(`🎣 "${word}" 낚음!`);
@@ -635,28 +687,35 @@ function clearAutoTimer(){
 window.revealAnswer=async function(){
   clearAutoTimer();
   $('timer-bar-wrap').style.display='none';
-  const ri=gameState.currentRound||0,rd=getCurRound(),answer=(rd.answer||'').trim();
-  if(!answer){toast('정답이 설정되지 않았어요!');return;}
-  const players=gameState.players||{},updates={},winners=[];
+  const ri=gameState.currentRound||0,rd=getCurRound();
+  const answers=(rd.answers||[]).filter(a=>a.trim());
+  if(answers.length===0){toast('정답 단어가 설정되지 않았어요!');return;}
+  const players=gameState.players||{},updates={},winners=new Map();
   Object.entries(players).forEach(([pid,p])=>{
+    let gotCorrect=false;
     Object.entries(p.tank||{}).forEach(([word,info])=>{
       if((info.round||0)===ri){
-        const ok=word===answer;
+        const ok=answers.includes(word);
         updates[`players/${pid}/tank/${word}/correct`]=ok;
-        if(ok){updates[`players/${pid}/score`]=(p.score||0)+10;winners.push({name:p.name,color:p.color});}
+        if(ok&&!gotCorrect){gotCorrect=true;}
       }
     });
+    if(gotCorrect&&!winners.has(pid)){
+      updates[`players/${pid}/score`]=(p.score||0)+10;
+      winners.set(pid,{name:p.name,color:p.color});
+    }
   });
   updates[`rounds/${ri}/revealed`]=true;
   await update(ref(db,`rooms/${roomId}`),updates);
-  showRoundResult(ri,answer,winners);
-  addLog(`✅ ${ri+1}라운드 정답: "${answer}" | 정답자: ${winners.map(w=>w.name).join(', ')||'없음'}`);
+  const wArr=[...winners.values()];
+  showRoundResult(ri,answers,wArr);
+  addLog(`✅ ${ri+1}라운드 정답: [${answers.join(', ')}] | 정답자: ${wArr.map(w=>w.name).join(', ')||'없음'}`);
 };
 
-function showRoundResult(ri,answer,winners){
+function showRoundResult(ri,answers,winners){
   const total=gameState.totalRounds||1;
   $('rr-title').textContent=`${ri+1}라운드 정답 공개!`;
-  $('rr-answer').textContent=`"${answer}"`;
+  $('rr-answer').textContent=Array.isArray(answers)?answers.map(a=>`"${a}"`).join('  /  '):`"${answers}"`;
   $('rr-desc').textContent=winners.length?`${winners.length}명 정답! 각 +10점`:'아무도 정답을 낚지 못했어요 😢';
   const wd=$('rr-winners');wd.innerHTML='';
   winners.forEach(w=>{const c=document.createElement('div');c.className='rr-chip';c.style.cssText=`border-color:${w.color};color:${w.color};background:rgba(0,0,0,.2)`;c.textContent=`🎉 ${w.name}`;wd.appendChild(c);});
