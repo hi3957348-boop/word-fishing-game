@@ -57,6 +57,12 @@ header h1 span{color:var(--gold);}
 #preview-pond{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:36px;}
 .preview-chip{background:rgba(255,255,255,.1);border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:4px;}
 .preview-chip .cnt{background:var(--gold);color:#0a2342;border-radius:50%;width:17px;height:17px;font-size:.65rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+/* 타이머 */
+#timer-bar-wrap{max-width:600px;margin:0 auto 10px;display:none;}
+#timer-label{font-size:.78rem;opacity:.65;text-align:center;margin-bottom:4px;}
+#timer-track{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;}
+#timer-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#ff5252,#ffd600);transition:width 1s linear;}
+#timer-num{font-size:1.3rem;font-weight:900;color:var(--gold);text-align:center;margin-top:3px;}
 /* 대기실 */
 #waiting-room{display:none;text-align:center;padding:40px 20px;}
 #waiting-room h2{font-size:1.2rem;font-weight:700;margin-bottom:8px;}
@@ -205,10 +211,15 @@ header h1 span{color:var(--gold);}
       <div style="font-size:.82rem;">정답: <strong id="hg-answer" style="color:#ff8a65"></strong></div>
     </div>
     <div class="hrow">
-      <button class="btn btn-primary" style="font-size:.85rem" onclick="revealAnswer()">✅ 정답 공개</button>
+      <button class="btn btn-primary" style="font-size:.85rem" id="reveal-btn" onclick="revealAnswer()">✅ 정답 공개</button>
       <button class="btn btn-ghost" style="font-size:.85rem" id="next-round-btn" onclick="nextRound()" disabled>다음 라운드 →</button>
       <button class="btn btn-danger" style="font-size:.78rem" onclick="endGame()">게임 종료</button>
     </div>
+  </div>
+  <div id="timer-bar-wrap">
+    <div id="timer-label">⏱ 자동 정답 공개까지</div>
+    <div id="timer-track"><div id="timer-fill" style="width:100%"></div></div>
+    <div id="timer-num">10</div>
   </div>
   <div id="round-display">
     <div class="prompt-box" id="prompt-box" style="display:none">
@@ -265,7 +276,7 @@ const app=initializeApp(firebaseConfig);
 const db=getDatabase(app);
 
 const DEFAULT_WORDS=[];
-const PLAYER_COLORS=["#ff7043","#ab47bc","#26a69a","#42a5f5"];
+const PLAYER_COLORS=["#ff7043","#ab47bc","#26a69a","#42a5f5","#f9a825","#00acc1"];
 const FISH_COLORS=[
   ["#0d47a1","#1565c0"],["#1b5e20","#2e7d32"],["#4a148c","#6a1b9a"],
   ["#bf360c","#d84315"],["#006064","#00838f"],["#827717","#9e9d24"],
@@ -274,6 +285,7 @@ const FISH_COLORS=[
 ];
 
 let roomId,playerId,playerName,isHost;
+let autoRevealTimer=null,timerInterval=null,timerStartedRound=-1;
 let gameState={};
 let curSetupRound=0;
 let roundConfigs=Array.from({length:5},()=>({words:[],prompt:'',answer:''}));
@@ -416,7 +428,7 @@ window.joinRoom=async function(){
   if(!snap.exists()){$('lobby-msg').textContent='존재하지 않는 방입니다';return;}
   const data=snap.val();
   const cnt=Object.keys(data.players||{}).length;
-  if(cnt>=3){$('lobby-msg').textContent='참여자가 꽉 찼습니다 (최대 3명)';return;}
+  if(cnt>=6){$('lobby-msg').textContent='참여자가 꽉 찼습니다 (최대 6명)';return;}
   if(data.status==='ended'){$('lobby-msg').textContent='이미 종료된 게임입니다';return;}
   roomId=rc;playerId='p_'+Date.now();playerName=nn;isHost=false;
   await update(ref(db,`rooms/${roomId}/players/${playerId}`),{name:nn,score:0,color:PLAYER_COLORS[cnt],tank:{}});
@@ -460,6 +472,7 @@ function enterGame(){
     gameState=snap.val();
     renderRoundBar();renderScoreboard();renderPond();renderTanks();
     renderPromptDisplay();updateHostPanel();
+    handleAutoRevealTimer();
     if(gameState.status==='ended')showResultScreen();
   });
 }
@@ -581,8 +594,47 @@ function renderTanks(){
   });
 }
 
+/* ── 자동 정답 공개 타이머 ── */
+function handleAutoRevealTimer(){
+  const rd=getCurRound();
+  const ri=gameState.currentRound||0;
+  // 이미 공개됐거나 게임 중 아니면 타이머 숨김
+  if(rd.revealed||gameState.status!=='playing'){
+    clearAutoTimer();
+    $('timer-bar-wrap').style.display='none';
+    return;
+  }
+  // 이미 이 라운드 타이머가 돌고 있으면 스킵
+  if(timerStartedRound===ri) return;
+  timerStartedRound=ri;
+  clearAutoTimer();
+  $('timer-bar-wrap').style.display='block';
+  let sec=10;
+  $('timer-num').textContent=sec;
+  $('timer-fill').style.width='100%';
+  timerInterval=setInterval(()=>{
+    sec--;
+    $('timer-num').textContent=sec;
+    $('timer-fill').style.width=(sec/10*100)+'%';
+    if(sec<=3) $('timer-fill').style.background='#ff5252';
+    else $('timer-fill').style.background='linear-gradient(90deg,#ff5252,#ffd600)';
+    if(sec<=0){
+      clearAutoTimer();
+      $('timer-bar-wrap').style.display='none';
+      if(isHost) revealAnswer();
+    }
+  },1000);
+}
+function clearAutoTimer(){
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+  if(autoRevealTimer){clearTimeout(autoRevealTimer);autoRevealTimer=null;}
+  timerStartedRound=-1;
+}
+
 /* ── 정답 공개 ── */
 window.revealAnswer=async function(){
+  clearAutoTimer();
+  $('timer-bar-wrap').style.display='none';
   const ri=gameState.currentRound||0,rd=getCurRound(),answer=(rd.answer||'').trim();
   if(!answer){toast('정답이 설정되지 않았어요!');return;}
   const players=gameState.players||{},updates={},winners=[];
@@ -620,7 +672,7 @@ function showRoundResult(ri,answer,winners){
   $('round-result-overlay').classList.add('open');
 }
 
-window.nextRound=async function(){
+window.nextRound=async function(){clearAutoTimer();timerStartedRound=-1;
   const ri=gameState.currentRound||0,total=gameState.totalRounds||1;
   if(ri+1>=total){endGame();return;}
   await update(ref(db,`rooms/${roomId}`),{currentRound:ri+1});
