@@ -782,33 +782,34 @@ window.revealAnswer=async function(){
   if(answers.length===0){toast('정답 단어가 설정되지 않았어요!');return;}
   const players=gameState.players||{},updates={},winners=new Map();
   Object.entries(players).forEach(([pid,p])=>{
-    let gotCorrect=false;
+    let correctCount=0;
     Object.entries(p.tank||{}).forEach(([word,info])=>{
       if((info.round||0)===ri){
         const ok=answers.includes(word);
         updates[`players/${pid}/tank/${word}/correct`]=ok;
-        if(ok&&!gotCorrect){gotCorrect=true;}
+        if(ok) correctCount++;
       }
     });
-    if(gotCorrect&&!winners.has(pid)){
-      updates[`players/${pid}/score`]=(p.score||0)+10;
-      winners.set(pid,{name:p.name,color:p.color});
+    if(correctCount>0){
+      const earned=correctCount*10;
+      updates[`players/${pid}/score`]=(p.score||0)+earned;
+      winners.set(pid,{name:p.name,color:p.color,earned,correctCount});
     }
   });
   updates[`rounds/${ri}/revealed`]=true;
   await update(ref(db,`rooms/${roomId}`),updates);
   const wArr=[...winners.values()];
   showRoundResult(ri,answers,wArr);
-  addLog(`✅ ${ri+1}라운드 정답: [${answers.join(', ')}] | 정답자: ${wArr.map(w=>w.name).join(', ')||'없음'}`);
+  addLog(`✅ ${ri+1}라운드 정답: [${answers.join(', ')}] | 정답자: ${wArr.map(w=>`${w.name}(+${w.earned}점)`).join(', ')||'없음'}`);
 };
 
 function showRoundResult(ri,answers,winners){
   const total=gameState.totalRounds||1;
   $('rr-title').textContent=`${ri+1}라운드 정답 공개!`;
   $('rr-answer').textContent=Array.isArray(answers)?answers.map(a=>`"${a}"`).join('  /  '):`"${answers}"`;
-  $('rr-desc').textContent=winners.length?`${winners.length}명 정답! 각 +10점`:'아무도 정답을 낚지 못했어요 😢';
+  $('rr-desc').textContent=winners.length?`${winners.length}명 정답!`:'아무도 정답을 낚지 못했어요 😢';
   const wd=$('rr-winners');wd.innerHTML='';
-  winners.forEach(w=>{const c=document.createElement('div');c.className='rr-chip';c.style.cssText=`border-color:${w.color};color:${w.color};background:rgba(0,0,0,.2)`;c.textContent=`🎉 ${w.name}`;wd.appendChild(c);});
+  winners.forEach(w=>{const c=document.createElement('div');c.className='rr-chip';c.style.cssText=`border-color:${w.color};color:${w.color};background:rgba(0,0,0,.2)`;c.textContent=`🎉 ${w.name} +${w.earned||10}점 (${w.correctCount||1}개)`;wd.appendChild(c);});
   const ba=$('rr-btn-area');ba.innerHTML='';
   if(isHost){
     const btn=document.createElement('button');btn.className='btn btn-primary';
